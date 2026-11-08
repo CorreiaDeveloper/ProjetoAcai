@@ -1,0 +1,7 @@
+# arquivos do sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# editor
+.vscode/
