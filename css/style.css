@@ -2,16 +2,6 @@
    Ganath Açaí
    ============================================================ */
 
-@property --ini {
-  syntax: "<angle>";
-  inherits: true;
-  initial-value: 0deg;
-}
-@property --arco {
-  syntax: "<angle>";
-  inherits: true;
-  initial-value: 0deg;
-}
 @property --revela {
   syntax: "<percentage>";
   inherits: false;
@@ -216,9 +206,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgb(43 10 49 / 0.84);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  backdrop-filter: blur(14px) saturate(1.4);
+  background: var(--acai-800); /* sólido, sem vidro fosco: o desfoque de fundo travava a animação no celular */
   border-bottom: 1px solid rgb(255 255 255 / 0.06);
 }
 
@@ -802,8 +790,7 @@ h1 {
   position: absolute;
   inset: 8% 6% -4%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(8 0 12 / 0.8), rgb(8 0 12 / 0.35) 70%, transparent);
-  filter: blur(10px);
+  background: radial-gradient(closest-side, rgb(8 0 12 / 0.75), rgb(8 0 12 / 0.4) 45%, rgb(8 0 12 / 0.12) 75%, transparent);
   transform: translateY(6%) scale(var(--escala));
   transition: transform 0.7s var(--mola);
 }
@@ -883,59 +870,31 @@ h1 {
   inset: 0;
   background: #3a0c3f url("../img/acai.webp") center / cover no-repeat;
 }
+/* as fatias de cada fruta/acompanhamento são desenhadas neste canvas (veja criarCopo no app.js) */
 .copo-fatias {
   position: absolute;
   inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-/* cada fruta/acompanhamento vira uma fatia do anel */
-.fatia {
+/* montinho de açaí no centro, por cima das fatias (mesma foto, alinhada com o fundo) */
+.copo-centro {
   position: absolute;
-  inset: 0;
-  filter: drop-shadow(0 1px 2px rgb(12 0 16 / 0.7)) drop-shadow(0 4px 8px rgb(12 0 16 / 0.35));
+  inset: 31%;
+  border-radius: 50%;
+  background: #3a0c3f url("../img/acai.webp") center / 263% no-repeat;
+  opacity: 0;
   transition:
-    --ini 0.75s var(--mola),
-    --arco 0.75s var(--mola);
+    opacity 0.35s var(--suave),
+    box-shadow 0.35s var(--suave);
 }
-.fatia-foto {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: center / cover no-repeat;
-  -webkit-mask-image:
-    conic-gradient(
-      from var(--ini),
-      transparent 0deg,
-      #000 1.4deg,
-      #000 calc(var(--arco) - 1.4deg),
-      transparent var(--arco)
-    ),
-    radial-gradient(closest-side, transparent 33%, #000 36%);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    conic-gradient(
-      from var(--ini),
-      transparent 0deg,
-      #000 1.4deg,
-      #000 calc(var(--arco) - 1.4deg),
-      transparent var(--arco)
-    ),
-    radial-gradient(closest-side, transparent 33%, #000 36%);
-  mask-composite: intersect;
-}
-.fatia-foto::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(
-    closest-side,
-    transparent 33%,
-    rgb(20 0 24 / 0.45) 36%,
-    transparent 46%,
-    transparent 86%,
-    rgb(20 0 24 / 0.4) 100%
-  );
+.copo.com-fatias .copo-centro {
+  opacity: 1;
+  box-shadow:
+    0 0 0 1px rgb(20 0 24 / 0.35),
+    0 3px 14px 4px rgb(14 0 18 / 0.6);
 }
 
 /* calda (foto) que vai sendo despejada por cima */
@@ -943,17 +902,16 @@ h1 {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 76%;
-  aspect-ratio: 820 / 417;
+  width: 80%;
+  aspect-ratio: 872 / 469;
   translate: -50% -50%;
   rotate: var(--giro, 0deg);
-  background: center / contain no-repeat;
+  background: center / contain no-repeat; /* a sombra já vem pronta na imagem */
   pointer-events: none;
-  filter: drop-shadow(0 3px 3px rgb(12 0 16 / 0.6));
   --revela: 0%;
   -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--revela) - 14%), transparent var(--revela));
   mask-image: linear-gradient(90deg, #000 calc(var(--revela) - 14%), transparent var(--revela));
-  transition: --revela 1.3s cubic-bezier(0.45, 0, 0.3, 1);
+  transition: --revela 1s cubic-bezier(0.45, 0, 0.3, 1);
 }
 .calda.ativa {
   --revela: 116%;
@@ -974,8 +932,7 @@ h1 {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 22%, rgb(255 255 255 / 0.4), transparent 34%);
-  mix-blend-mode: soft-light;
+  background: radial-gradient(circle at 30% 22%, rgb(255 255 255 / 0.16), transparent 34%);
 }
 
 .copo-estatico *,
@@ -1088,9 +1045,7 @@ h2 {
   gap: 10px;
   min-height: var(--barra-altura);
   padding: 10px var(--margem) calc(10px + env(safe-area-inset-bottom));
-  background: rgb(33 7 41 / 0.94);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  background: var(--acai-900); /* sólido, sem vidro fosco (mesmo motivo do topo) */
   border-top: 1px solid rgb(255 255 255 / 0.08);
 }
 .barra-copo {

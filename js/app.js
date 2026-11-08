@@ -70,6 +70,24 @@
 
   const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
+  // "mola": passa um pouquinho do ponto e volta (mesmo efeito da animação anterior)
+  const molinha = (t) => 1 + 2.3 * Math.pow(t - 1, 3) + 1.3 * Math.pow(t - 1, 2);
+
+  // fotos das fatias, carregadas uma vez só e reaproveitadas por todos os copos
+  const FOTOS = new Map();
+  function fotoDoItem(item, aoCarregar) {
+    let img = FOTOS.get(item.id);
+    if (!img) {
+      img = new Image();
+      img.decoding = "async";
+      img.src = item.img;
+      img.decode?.().catch(() => {}); // prepara a foto em segundo plano (evita engasgo no 1º desenho)
+      FOTOS.set(item.id, img);
+    }
+    if (aoCarregar && !(img.complete && img.naturalWidth)) img.addEventListener("load", aoCarregar, { once: true });
+    return img;
+  }
+
   /* ============================================================
      O copo visto de cima
      ============================================================ */
@@ -83,7 +101,8 @@
         <div class="copo-borda"></div>
         <div class="copo-disco">
           <div class="copo-acai"></div>
-          <div class="copo-fatias"></div>
+          <canvas class="copo-fatias" aria-hidden="true"></canvas>
+          <div class="copo-centro"></div>
           ${CALDAS.map(
             (c, i) =>
               `<div class="calda" data-id="${esc(c.id)}" style="--giro:${GIRO_CALDA[i % GIRO_CALDA.length]}deg;background-image:url('${esc(c.calda)}')"></div>`,
@@ -94,53 +113,121 @@
     alvo.replaceChildren(el);
     if (chegada) el.addEventListener("animationend", () => el.classList.remove("copo-chegada"), { once: true });
 
-    const caixa = $(".copo-fatias", el);
+    // As fatias são desenhadas num canvas: um único desenho por quadro, leve até em celular simples.
+    const tela = $(".copo-fatias", el);
+    const ctx = tela.getContext("2d");
     const caldas = $$(".calda", el);
-    const fatias = new Map();
+    const fatias = new Map(); // id → { item, ini, arco, de, para, t0, sair }
+    const DURACAO = 550;
+    let raf = 0;
+    let sombra = null;
+    let sombraW = 0;
+
+    function ajustarTela() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.round(tela.clientWidth * dpr);
+      if (w && tela.width !== w) {
+        tela.width = w;
+        tela.height = w;
+      }
+      return tela.width;
+    }
+
+    function pintar(agora) {
+      raf = 0;
+      const W = ajustarTela();
+      if (!W) return;
+      const c = W / 2;
+      const R = W / 2;
+      if (sombraW !== W) {
+        sombra = ctx.createRadialGradient(c, c, R * 0.84, c, c, R);
+        sombra.addColorStop(0, "rgba(20,0,24,0)");
+        sombra.addColorStop(1, "rgba(20,0,24,0.42)");
+        sombraW = W;
+      }
+      ctx.clearRect(0, 0, W, W);
+      let animando = false;
+      const instantaneo = estatico || semMovimento();
+      for (const [id, f] of fatias) {
+        const p = instantaneo ? 1 : Math.min(1, (agora - f.t0) / DURACAO);
+        const k = p >= 1 ? 1 : molinha(p);
+        f.ini = f.de.ini + (f.para.ini - f.de.ini) * k;
+        f.arco = Math.max(0, f.de.arco + (f.para.arco - f.de.arco) * k);
+        if (p < 1) animando = true;
+        else if (f.sair) {
+          fatias.delete(id);
+          continue;
+        }
+        if (f.arco < 0.3) continue;
+        const img = fotoDoItem(f.item, redesenhar);
+        if (!img.complete || !img.naturalWidth) continue;
+        const a0 = ((f.ini - 90) * Math.PI) / 180;
+        const a1 = ((f.ini + f.arco - 90) * Math.PI) / 180;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(c, c);
+        ctx.arc(c, c, R, a0, a1);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, 0, 0, W, W);
+        ctx.fillStyle = sombra;
+        ctx.fillRect(0, 0, W, W);
+        ctx.restore();
+        // risquinho escuro entre uma fatia e outra
+        ctx.strokeStyle = "rgba(20,0,24,0.38)";
+        ctx.lineWidth = Math.max(1, W / 260);
+        ctx.beginPath();
+        ctx.moveTo(c, c);
+        ctx.lineTo(c + R * Math.cos(a0), c + R * Math.sin(a0));
+        ctx.moveTo(c, c);
+        ctx.lineTo(c + R * Math.cos(a1), c + R * Math.sin(a1));
+        ctx.stroke();
+      }
+      if (animando) raf = requestAnimationFrame(pintar);
+    }
+
+    function redesenhar() {
+      if (!raf) raf = requestAnimationFrame(pintar);
+    }
+
+    // quando o copo aparece na tela (ou muda de tamanho), desenha de novo
+    if ("ResizeObserver" in window) new ResizeObserver(() => pintar(performance.now())).observe(tela);
 
     function desenhar(tamanho, itens) {
       el.style.setProperty("--escala", ESCALA[tamanho] ?? 1);
 
       const lista = ITENS.filter((i) => itens.has(i.id) && !i.calda);
       const n = lista.length;
-      const arco = n === 0 ? 0 : n < 5 ? 72 : 360 / n;
+      // as fatias ocupam no máximo 288° do copo: sempre sobra um pedaço de açaí à mostra
+      const arco = n === 0 ? 0 : Math.min(72, 288 / n);
       const inicio = -(arco * n) / 2;
+      el.classList.toggle("com-fatias", n > 0);
+      const agora = performance.now();
 
-      for (const [id, f] of fatias) {
-        if (itens.has(id)) continue;
-        fatias.delete(id);
-        if (estatico) {
-          f.remove();
-          continue;
-        }
-        const ini = parseFloat(f.style.getPropertyValue("--ini")) || 0;
-        const a = parseFloat(f.style.getPropertyValue("--arco")) || 0;
-        f.style.setProperty("--ini", `${ini + a / 2}deg`);
-        f.style.setProperty("--arco", "0deg");
-        setTimeout(() => f.remove(), 800);
+      for (const f of fatias.values()) {
+        if (itens.has(f.item.id) || f.sair) continue;
+        f.de = { ini: f.ini, arco: f.arco };
+        f.para = { ini: f.ini + f.arco / 2, arco: 0 }; // encolhe para o meio
+        f.t0 = agora;
+        f.sair = true;
       }
 
       lista.forEach((item, i) => {
         const ini = inicio + i * arco;
         let f = fatias.get(item.id);
         if (!f) {
-          f = document.createElement("div");
-          f.className = "fatia";
-          const foto = document.createElement("div");
-          foto.className = "fatia-foto";
-          foto.style.backgroundImage = `url("${item.img}")`;
-          f.append(foto);
-          f.style.setProperty("--ini", `${ini + arco / 2}deg`);
-          f.style.setProperty("--arco", "0deg");
-          caixa.append(f);
+          f = { item, ini: ini + arco / 2, arco: 0 }; // nasce do meio da própria fatia
           fatias.set(item.id, f);
-          if (!estatico) f.getBoundingClientRect(); // fixa o estado inicial antes de animar
         }
-        f.style.setProperty("--ini", `${ini}deg`);
-        f.style.setProperty("--arco", `${arco}deg`);
+        f.de = { ini: f.ini, arco: f.arco };
+        f.para = { ini, arco };
+        f.t0 = agora;
+        f.sair = false;
       });
 
       caldas.forEach((c) => c.classList.toggle("ativa", itens.has(c.dataset.id)));
+      if (estatico) pintar(agora);
+      else redesenhar();
     }
 
     function pular() {
@@ -215,7 +302,9 @@
   }
 
   const copoPrincipal = criarCopo($("[data-copo-principal]"), { chegada: true });
-  const copoMini = criarCopo($("[data-copo-mini]"));
+  // o copinho da barra só acompanha (sem animar), para não pesar no celular
+  const copoMini = criarCopo($("[data-copo-mini]"), { estatico: true });
+  ITENS.forEach((i) => fotoDoItem(i)); // pré-carrega as fotos das fatias
   let timerDesenho;
 
   function resumoTexto(tamanho, itens) {
@@ -283,7 +372,7 @@
           { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - subida}px) scale(1.05)`, opacity: 1, offset: 0.5 },
           { transform: `translate(${dx}px, ${dy}px) scale(${escalaFinal})`, opacity: 0.1 },
         ],
-        { duration: 600, easing: "cubic-bezier(.4,.05,.5,1)" },
+        { duration: 460, easing: "cubic-bezier(.4,.05,.5,1)" },
       )
       .finished.finally(() => voo.remove());
     return true;
@@ -364,7 +453,7 @@
       montagem.itens.add(item.id);
       vibrar(10);
       const voou = voar(inp.nextElementSibling, item);
-      atualizarMontagem({ atraso: voou ? 400 : 0 });
+      atualizarMontagem({ atraso: voou ? 260 : 0 });
     } else {
       montagem.itens.delete(item.id);
       atualizarMontagem();
