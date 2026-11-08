@@ -13,7 +13,8 @@ Dê dois cliques em `index.html`. Ele abre no navegador e funciona sem instalar 
 | Número que recebe os pedidos | `whatsapp`: 55 + DDD + número, só dígitos |
 | Número que aparece no rodapé | `telefoneExibicao` |
 | Endereço | `endereco` |
-| Horário de funcionamento | `horario` (deixe `""` para não mostrar) |
+| Horário de funcionamento (texto) | `horario` (deixe `""` para não mostrar) |
+| Aviso "Aberto agora" / "Fechado" | `funcionamento`: dias (0 = domingo … 6 = sábado), `abre` e `fecha` |
 | Taxa de entrega | `taxaEntrega` (`0` = grátis) |
 | Perguntar a forma de pagamento | `formasPagamento`: deixe `[]` para não perguntar, ou ex.: `["Pix", "Dinheiro"]` |
 | Preço dos copos | `tamanhos` |
@@ -25,6 +26,14 @@ Os preços usam ponto, não vírgula: `14.90`.
 Se `formasPagamento` tiver `"Dinheiro"`, o site também pergunta "troco para quanto?".
 
 Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `preco` e coloque uma foto quadrada em `img/`. O ideal é a foto da fruta ocupando a imagem inteira, vista de cima.
+
+## Recursos do site
+
+- **Aberto / fechado automático:** usa o horário de São Paulo. Pedido feito com a loja fechada pode ser enviado, mas chega marcado no WhatsApp.
+- **Sacola esvazia ao enviar:** quando a pessoa toca em "Enviar pedido pelo WhatsApp", a sacola fica vazia. Nome, prédio e apartamento continuam lembrados para o próximo pedido.
+- **Pedir de novo:** o celular de cada morador lembra o último pedido, que pode ser repetido com um toque.
+- **Festa de frutas:** quando a pessoa volta do WhatsApp depois de enviar, as frutas do pedido "explodem" na tela.
+- **Aplicativo:** pelo menu do navegador, "Adicionar à tela inicial" cria o ícone da Ganath no celular (arquivo `manifest.webmanifest`).
 
 ## Logo
 

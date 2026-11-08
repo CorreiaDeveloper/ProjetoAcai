@@ -22,6 +22,12 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="img/icone-64.png" type="image/png">
   <link rel="apple-touch-icon" href="img/icone-180.png">
+  <!-- "aplicativo" na tela inicial do celular -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Ganath">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,6 +54,15 @@
   <main>
     <section class="montador" id="montar" aria-labelledby="titulo">
       <div class="intro">
+        <p class="status" data-status hidden><span class="status-ponto" aria-hidden="true"></span><span data-status-texto></span></p>
+        <div class="repetir" data-repetir hidden>
+          <div class="repetir-copo" data-repetir-copo aria-hidden="true"></div>
+          <div class="repetir-texto">
+            <strong>Pedir de novo?</strong>
+            <span data-repetir-resumo></span>
+          </div>
+          <button class="btn-repetir" type="button" data-repetir-botao>Repetir</button>
+        </div>
         <h1 id="titulo">Monte o seu açaí</h1>
         <p class="lead">Escolha o tamanho, as frutas e os acompanhamentos. O pedido vai direto para o nosso WhatsApp e a gente leva até o seu apartamento.</p>
       </div>
@@ -58,7 +73,9 @@
       </div>
 
       <aside class="painel" aria-label="Seu copo">
-        <div class="painel-copo" data-copo-principal></div>
+        <div class="palco">
+          <div class="painel-copo" data-copo-principal></div>
+        </div>
         <p class="painel-resumo" data-resumo aria-live="polite"></p>
         <div class="painel-acao">
           <div class="painel-total">
@@ -188,6 +205,7 @@
             <textarea name="obs" rows="2" placeholder="Ex.: açaí bem batido, sem colher"></textarea>
           </label>
 
+          <p class="aviso-fechado" data-aviso-fechado hidden></p>
           <p class="checkout-erro" data-erro role="alert"></p>
         </form>
       </div>
@@ -196,8 +214,7 @@
         <h3>Pedido aberto no WhatsApp</h3>
         <p>Confira a mensagem e toque em enviar por lá. A gente confirma o pedido e o tempo de preparo na conversa.</p>
         <p class="enviado-dica">Se o WhatsApp não abriu, <a data-link-pedido href="#" target="_blank" rel="noopener">toque aqui</a>.</p>
-        <button class="btn btn-primario" type="button" data-limpar-sacola>Limpar sacola e montar outro</button>
-        <button class="btn-texto" type="button" data-voltar-sacola>Voltar para a sacola</button>
+        <button class="btn btn-primario" type="button" data-montar-outro>Montar outro açaí</button>
       </div>
     </div>
 

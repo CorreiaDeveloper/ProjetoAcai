@@ -68,6 +68,8 @@
 
   const nomesDoGrupo = (ids, grupo) => ids.filter((id) => ITEM[id].grupo === grupo).map((id) => ITEM[id].nome);
 
+  const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
   /* ============================================================
      O copo visto de cima
      ============================================================ */
@@ -388,13 +390,7 @@
     const itens = ITENS.filter((i) => montagem.itens.has(i.id)).map((i) => i.id);
     const igual = sacola.find((c) => c.tamanho === montagem.tamanho && c.itens.join() === itens.join());
     if (igual) igual.qtd += 1;
-    else
-      sacola.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        tamanho: montagem.tamanho,
-        itens,
-        qtd: 1,
-      });
+    else sacola.push({ id: novoId(), tamanho: montagem.tamanho, itens, qtd: 1 });
     salvarSacola();
     pularContador();
     vibrar([10, 40, 10]);
@@ -607,7 +603,9 @@
   function montarMensagem() {
     const f = form.elements;
     const t = calcularTotais();
-    const linhas = [`*Pedido - ${L.nome}*`, ""];
+    const linhas = [`*Pedido - ${L.nome}*`];
+    if (statusAtual && !statusAtual.aberto) linhas.push("_(enviado com a loja fechada)_");
+    linhas.push("");
 
     for (const c of sacola) {
       const frutas = nomesDoGrupo(c.itens, "frutas");
@@ -646,23 +644,25 @@
 
     const url = `https://wa.me/${String(L.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(montarMensagem())}`;
     $("[data-link-pedido]").href = url;
+    guardar("ganath:ultimo", {
+      data: Date.now(),
+      copos: sacola.map(({ tamanho, itens, qtd }) => ({ tamanho, itens, qtd })),
+    });
+    renderRepetir();
+    celebrar = true;
+
     const janela = window.open(url, "_blank");
     if (janela) janela.opener = null;
     else location.href = url;
 
+    // pedido finalizado: a sacola esvazia. Se a pessoa não chegar a enviar no WhatsApp,
+    // o "Pedir de novo" (ou o link "toque aqui") recupera tudo.
+    sacola = [];
+    guardar("ganath:sacola", sacola);
+    atualizarContador();
     modoEnviado = true;
     renderSacola();
     $(".sacola-corpo").scrollTop = 0;
-  });
-
-  $("[data-limpar-sacola]").addEventListener("click", () => {
-    sacola = [];
-    salvarSacola();
-    irParaMontador();
-  });
-  $("[data-voltar-sacola]").addEventListener("click", () => {
-    modoEnviado = false;
-    renderSacola();
   });
 
   /* ---------- aviso rápido ---------- */
@@ -681,6 +681,154 @@
     clearTimeout(timerAviso);
     $("[data-aviso]").hidden = true;
   }
+
+  /* ============================================================
+     Aberto/fechado, pedir de novo e festa de frutas
+     ============================================================ */
+
+  /* ---------- aberto / fechado pelo horário de São Paulo ---------- */
+  const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+  const minutos = (hhmm) => {
+    const [h, m] = String(hhmm).split(":").map(Number);
+    return h * 60 + (m || 0);
+  };
+  const horaTexto = (mins) =>
+    mins >= 1440 ? "meia-noite" : `${Math.floor(mins / 60)}h${mins % 60 ? String(mins % 60).padStart(2, "0") : ""}`;
+
+  function agoraNaLoja() {
+    const partes = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date());
+    const v = (t) => partes.find((p) => p.type === t)?.value;
+    return {
+      dia: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(v("weekday")),
+      min: Number(v("hour")) * 60 + Number(v("minute")),
+    };
+  }
+
+  function statusLoja() {
+    const F = L.funcionamento;
+    if (!F || !Array.isArray(F.dias) || !F.dias.length) return null;
+    const { dia, min } = agoraNaLoja();
+    const abre = minutos(F.abre);
+    const fecha = minutos(F.fecha);
+    if (F.dias.includes(dia) && min >= abre && min < fecha) {
+      return { aberto: true, texto: `Aberto agora, até ${fecha >= 1440 ? "meia-noite" : `as ${horaTexto(fecha)}`}` };
+    }
+    for (let k = 0; k < 8; k++) {
+      const d = (dia + k) % 7;
+      if (!F.dias.includes(d) || (k === 0 && min >= abre)) continue;
+      const quando = k === 0 ? "hoje" : k === 1 ? "amanhã" : DIAS[d];
+      return { aberto: false, quando, hora: horaTexto(abre), texto: `Fechado agora. Abre ${quando} às ${horaTexto(abre)}` };
+    }
+    return null;
+  }
+
+  let statusAtual = null;
+  function atualizarStatus() {
+    statusAtual = statusLoja();
+    const el = $("[data-status]");
+    el.hidden = !statusAtual;
+    const aviso = $("[data-aviso-fechado]");
+    aviso.hidden = !statusAtual || statusAtual.aberto;
+    if (!statusAtual) return;
+    el.classList.toggle("aberto", statusAtual.aberto);
+    $("[data-status-texto]").textContent = statusAtual.texto;
+    if (!statusAtual.aberto) {
+      aviso.textContent = `Estamos fechados agora. Pode enviar o pedido mesmo assim: a gente responde ${statusAtual.quando} a partir das ${statusAtual.hora}.`;
+    }
+  }
+
+  /* ---------- pedir de novo ---------- */
+  function lerUltimo() {
+    const u = ler("ganath:ultimo", null);
+    if (!u || !Array.isArray(u.copos)) return null;
+    const copos = u.copos
+      .filter((c) => c && TAMANHO[c.tamanho])
+      .map((c) => ({
+        tamanho: c.tamanho,
+        itens: (c.itens || []).filter((id) => ITEM[id]),
+        qtd: Math.max(1, c.qtd | 0),
+      }));
+    return copos.length ? { ...u, copos } : null;
+  }
+
+  function descreverCopo(c) {
+    const nomes = c.itens.map((id) => minuscula(ITEM[id].nome));
+    return `Açaí ${TAMANHO[c.tamanho].nome}${nomes.length ? ` com ${listaNatural(nomes)}` : " puro"}`;
+  }
+
+  function renderRepetir() {
+    const u = lerUltimo();
+    const box = $("[data-repetir]");
+    box.hidden = !u;
+    if (!u) return;
+    const total = u.copos.reduce((s, c) => s + c.qtd, 0);
+    const primeiro = u.copos[0];
+    $("[data-repetir-resumo]").textContent =
+      u.copos.length === 1
+        ? `${primeiro.qtd > 1 ? `${primeiro.qtd}x ` : ""}${descreverCopo(primeiro)}`
+        : `${total} copos: ${descreverCopo(primeiro)} e mais`;
+    criarCopo($("[data-repetir-copo]"), { estatico: true }).desenhar(primeiro.tamanho, new Set(primeiro.itens));
+  }
+
+  $("[data-repetir-botao]").addEventListener("click", () => {
+    const u = lerUltimo();
+    if (!u) return;
+    for (const c of u.copos) {
+      const igual = sacola.find((x) => x.tamanho === c.tamanho && x.itens.join() === c.itens.join());
+      if (igual) igual.qtd += c.qtd;
+      else sacola.push({ id: novoId(), ...c });
+    }
+    salvarSacola();
+    pularContador();
+    vibrar([10, 40, 10]);
+    abrirSacola();
+  });
+
+  /* ---------- festa de frutas quando a pessoa volta do WhatsApp ---------- */
+  let celebrar = false;
+
+  function festa() {
+    if (semMovimento()) return;
+    const u = lerUltimo();
+    const doPedido = [...new Set((u?.copos || []).flatMap((c) => c.itens))].map((id) => ITEM[id].img);
+    const fotos = doPedido.length >= 3 ? doPedido : ITENS.map((i) => i.img);
+    const palco = dialogo.open ? dialogo : document.body;
+    const cx = innerWidth / 2;
+    const cy = innerHeight * 0.42;
+    for (let i = 0; i < 30; i++) {
+      const p = document.createElement("span");
+      p.className = "confete";
+      const t = 16 + Math.random() * 24;
+      p.style.cssText = `width:${t}px;height:${t}px;left:${cx - t / 2}px;top:${cy - t / 2}px;background-image:url("${fotos[i % fotos.length]}")`;
+      palco.append(p);
+      const ang = Math.random() * Math.PI * 2;
+      const forca = 110 + Math.random() * 190;
+      const dx = Math.cos(ang) * forca;
+      const dy = Math.sin(ang) * forca - 150;
+      p.animate(
+        [
+          { transform: "translate(0, 0) scale(0.3) rotate(0deg)", opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(1) rotate(${Math.random() * 360}deg)`, opacity: 1, offset: 0.42 },
+          { transform: `translate(${dx * 1.15}px, ${dy + 460}px) scale(0.9) rotate(${Math.random() * 720}deg)`, opacity: 0 },
+        ],
+        { duration: 1500 + Math.random() * 800, easing: "cubic-bezier(.2,.7,.35,1)" },
+      ).finished.finally(() => p.remove());
+    }
+    vibrar([15, 60, 15]);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && celebrar) {
+      celebrar = false;
+      setTimeout(festa, 300);
+    }
+  });
 
   /* ---------- informações da loja ---------- */
   function preencherLoja() {
@@ -713,4 +861,7 @@
   atualizarContador();
   atualizarMontagem();
   marcarAba(0);
+  atualizarStatus();
+  setInterval(atualizarStatus, 60 * 1000);
+  renderRepetir();
 })();
