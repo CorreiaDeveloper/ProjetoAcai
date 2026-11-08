@@ -46,7 +46,9 @@ O site é só HTML, CSS e JavaScript, sem servidor. Qualquer uma destas opções
 - **Netlify Drop:** acesse app.netlify.com/drop e arraste a pasta inteira do projeto.
 - **GitHub Pages** ou **Vercel:** suba a pasta como um repositório.
 
-Depois de publicar, troque `img/copo.webp` na linha `og:image` do `index.html` pelo endereço completo (ex.: `https://seusite.com/img/copo.webp`). Assim a foto aparece quando o link for compartilhado no grupo do condomínio.
+O site está configurado para o GitHub Pages, no endereço **https://correiadeveloper.github.io/ProjetoAcai/**. Para ativar: no repositório, abra **Settings** → **Pages**, escolha a branch `main` e a pasta `/ (root)` e clique em **Save**.
+
+A imagem que aparece quando o link é compartilhado é `img/compartilhar.jpg`. Se um dia o site mudar de endereço, atualize as linhas `og:url` e `og:image` no `index.html`.
 
 ## Estrutura
 
