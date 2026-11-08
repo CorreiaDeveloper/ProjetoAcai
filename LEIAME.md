@@ -46,7 +46,7 @@ O site é só HTML, CSS e JavaScript, sem servidor. Qualquer uma destas opções
 - **Netlify Drop:** acesse app.netlify.com/drop e arraste a pasta inteira do projeto.
 - **GitHub Pages** ou **Vercel:** suba a pasta como um repositório.
 
-O site está configurado para o GitHub Pages, no endereço **https://correiadeveloper.github.io/ProjetoAcai/**. Para ativar: no repositório, abra **Settings** → **Pages**, escolha a branch `main` e a pasta `/ (root)` e clique em **Save**.
+O site está publicado na Vercel, em **https://ganath.vercel.app/**. Cada envio para a branch `main` do GitHub atualiza o site sozinho em menos de 1 minuto.
 
 A imagem que aparece quando o link é compartilhado é `img/compartilhar.jpg`. Se um dia o site mudar de endereço, atualize as linhas `og:url` e `og:image` no `index.html`.
 
