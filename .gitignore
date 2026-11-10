@@ -5,3 +5,6 @@ desktop.ini
 
 # editor
 .vscode/
+
+# página de gestão: SÓ LOCAL (nunca vai para o GitHub nem para a Vercel)
+gestao/
