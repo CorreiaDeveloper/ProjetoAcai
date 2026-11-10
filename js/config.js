@@ -52,7 +52,7 @@ window.LOJA = {
     { id: "pacoca", nome: "Paçoca", preco: 2.0, img: "img/pacoca.webp" },
     { id: "sucrilhos", nome: "Sucrilhos", preco: 2.0, img: "img/sucrilhos.webp" },
     { id: "leite-ninho", nome: "Leite Ninho", preco: 3.0, img: "img/leite-ninho.webp" },
-    { id: "granola", nome: "Granola", preco: 2.0, img: "img/granola.webp" },
+    { id: "granola", nome: "Granola", preco: 3.5, img: "img/granola.webp" },
     { id: "bala-de-goma", nome: "Bala de goma", preco: 2.5, img: "img/bala-de-goma.webp" },
     { id: "confete", nome: "Confete de chocolate", preco: 2.5, img: "img/confete.webp" },
   ],
