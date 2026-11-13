@@ -153,8 +153,11 @@
     auth: { storageKey: "ganath-painel", persistSession: true, autoRefreshToken: true },
   });
 
-  /* ---------- login ---------- */
-  let usuarioAtual = null;
+  /* ---------- login (senha + código do app autenticador) ----------
+     A página só mostra as telas certas. Quem barra de verdade é o banco:
+     sem o código do autenticador AUTORIZADO, ele não entrega nem altera nada. */
+  let estadoAtual = null; // "usuário:nível" já tratado (evita refazer a cada renovação do acesso)
+  let geracao = 0; // descarta respostas antigas se a sessão mudar no meio do caminho
 
   sb.auth.onAuthStateChange((_evento, sessao) => {
     // Não chamar o banco direto aqui dentro (recomendação do Supabase).
@@ -162,17 +165,37 @@
   });
 
   async function aoMudarSessao(sessao) {
-    const id = sessao?.user?.id || null;
-    if (id && id === usuarioAtual) return; // só renovou o acesso
-    usuarioAtual = id;
+    const minha = ++geracao;
     if (!sessao) {
+      estadoAtual = null;
       pararPainel();
       mostrarTela("login");
       return;
     }
+    const { data: nivel, error: erroNivel } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (minha !== geracao) return;
+    if (erroNivel || !nivel) {
+      erroFatal("Não deu para conferir o login. Recarregue a página.");
+      return;
+    }
+    const chave = `${sessao.user.id}:${nivel.currentLevel}`;
+    if (chave === estadoAtual) return; // só renovou o acesso
+    estadoAtual = chave;
+
+    if (nivel.currentLevel !== "aal2") {
+      pararPainel();
+      if (nivel.nextLevel === "aal2") mostrarCodigo();
+      else iniciarCadastro2fa();
+      return;
+    }
+
     mostrarTela("carregando");
+    // Primeira vez depois de ativar: autoriza este autenticador (só se for o único da conta).
+    await sb.rpc("fixar_meu_fator");
     const { data: ok, error } = await sb.rpc("sou_da_equipe");
+    if (minha !== geracao) return;
     if (error) {
+      estadoAtual = null;
       erroFatal("Não deu para conferir o acesso. Confira a internet e recarregue a página.");
       return;
     }
@@ -183,6 +206,132 @@
     }
     iniciarPainel();
   }
+
+  const somenteNumeros = (texto) => String(texto || "").replace(/\D/g, "");
+  function mensagemErroCodigo(error) {
+    const m = `${error?.message || ""} ${error?.code || ""} ${error?.status || ""}`;
+    if (/429|rate|too many|muitas/i.test(m)) return "Muitas tentativas. Espere alguns minutos e tente de novo.";
+    if (/fetch|network/i.test(m)) return "Sem conexão. Confira a internet.";
+    return "Código errado ou vencido. Espere o próximo código no app e tente de novo.";
+  }
+
+  /* ---------- 2ª etapa: digitar o código ---------- */
+  function mostrarCodigo() {
+    const form = $("[data-form-codigo]");
+    form.reset();
+    $("[data-erro-codigo]").textContent = "";
+    mostrarTela("codigo");
+    setTimeout(() => form.elements.codigo.focus(), 60);
+  }
+
+  $("[data-form-codigo]").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    prepararSom();
+    const form = e.currentTarget;
+    const erro = $("[data-erro-codigo]");
+    const codigo = somenteNumeros(form.elements.codigo.value);
+    if (codigo.length !== 6) {
+      erro.textContent = "Digite os 6 números do app.";
+      return;
+    }
+    const botao = $("button[type=submit]", form);
+    botao.disabled = true;
+    erro.textContent = "";
+    try {
+      const { data: fatores, error: erroFatores } = await sb.auth.mfa.listFactors();
+      if (erroFatores) throw erroFatores;
+      const totp = (fatores?.totp || []).filter((f) => f.status === "verified");
+      if (!totp.length) throw new Error("sem fator");
+      let falha = null;
+      for (const fator of totp) {
+        const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: fator.id, code: codigo });
+        if (!error) {
+          falha = null;
+          break;
+        }
+        falha = error;
+      }
+      if (falha) throw falha;
+      // deu certo: a sessão vira "duas etapas" e aoMudarSessao abre o painel
+    } catch (err) {
+      erro.textContent = mensagemErroCodigo(err);
+      form.elements.codigo.select();
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  /* ---------- primeira vez: ativar a verificação em duas etapas ---------- */
+  let cadastro = null; // { factorId }
+  let cadastrando = false;
+
+  async function iniciarCadastro2fa() {
+    mostrarTela("cadastro-2fa");
+    const form = $("[data-form-cadastro]");
+    const erro = $("[data-erro-cadastro]");
+    const qr = $("[data-qr]");
+    form.reset();
+    erro.textContent = "";
+    qr.hidden = true;
+    qr.removeAttribute("src");
+    $("[data-qr-carregando]").hidden = false;
+    $("[data-chave-secreta]").textContent = "…";
+    if (cadastrando) return;
+    cadastrando = true;
+    cadastro = null;
+    try {
+      // limpa tentativas antigas que não foram concluídas
+      const { data: fatores } = await sb.auth.mfa.listFactors();
+      for (const f of fatores?.all || []) {
+        if (f.status !== "verified") await sb.auth.mfa.unenroll({ factorId: f.id }).catch(() => {});
+      }
+      const { data, error } = await sb.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: `Painel Ganath ${Date.now()}`,
+        issuer: "Ganath Painel",
+      });
+      if (error) throw error;
+      cadastro = { factorId: data.id };
+      qr.src = data.totp.qr_code;
+      qr.hidden = false;
+      $("[data-qr-carregando]").hidden = true;
+      $("[data-chave-secreta]").textContent = String(data.totp.secret || "").replace(/(.{4})/g, "$1 ").trim();
+    } catch (err) {
+      $("[data-qr-carregando]").textContent = "Não deu para gerar o QR code.";
+      erro.textContent = `Recarregue a página e tente de novo. (${err?.message || "erro"})`;
+    } finally {
+      cadastrando = false;
+    }
+  }
+
+  $("[data-form-cadastro]").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    prepararSom();
+    const form = e.currentTarget;
+    const erro = $("[data-erro-cadastro]");
+    const codigo = somenteNumeros(form.elements.codigo.value);
+    if (!cadastro) {
+      erro.textContent = "Espere o QR code aparecer.";
+      return;
+    }
+    if (codigo.length !== 6) {
+      erro.textContent = "Digite os 6 números que aparecem no app.";
+      return;
+    }
+    const botao = $("button[type=submit]", form);
+    botao.disabled = true;
+    erro.textContent = "";
+    const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: cadastro.factorId, code: codigo });
+    botao.disabled = false;
+    if (error) {
+      erro.textContent = mensagemErroCodigo(error);
+      form.elements.codigo.select();
+      return;
+    }
+    cadastro = null;
+    toast("Verificação em duas etapas ativada!");
+    // a sessão vira "duas etapas" e aoMudarSessao autoriza este autenticador e abre o painel
+  });
 
   $("[data-form-login]").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -215,6 +364,17 @@
       await sb.auth.signOut({ scope: "local" });
     }),
   );
+
+  // Emergência: encerra o login em TODOS os aparelhos na hora
+  // (o banco confere se a sessão ainda existe a cada pedido).
+  $("[data-sair-todos]").addEventListener("click", async () => {
+    if (!confirm("Desconectar TODOS os aparelhos, inclusive este?\n\nDepois vocês entram de novo com a senha e o código do app.")) return;
+    const { error } = await sb.auth.signOut({ scope: "global" });
+    if (error) {
+      toast("Não deu para desconectar. Confira a internet e tente de novo.");
+      await sb.auth.signOut({ scope: "local" });
+    }
+  });
 
   /* ============================================================
      PEDIDOS
@@ -479,7 +639,37 @@
     if (p.loja_fechada) e.push(`<span class="p-etiqueta">Enviado com a loja fechada</span>`);
     if (p.cupom_ok === false)
       e.push(`<span class="p-etiqueta p-alerta" title="O desconto não bate com o cupom. Confira com o cliente.">Conferir cupom</span>`);
+    const esperado = valorNaoConfere(p);
+    if (esperado !== null)
+      e.push(`<span class="p-etiqueta p-alerta">Conferir valor: pelo cardápio daria ${dinheiro(esperado)}</span>`);
     return e.length ? `<p class="p-etiquetas">${e.join("")}</p>` : "";
+  }
+
+  // O total vem do celular do cliente. Recalcula pelo cardápio atual (js/config.js)
+  // para pegar valor adulterado. Devolve null quando não dá para conferir (item que saiu do cardápio).
+  function totalPeloCardapio(p) {
+    let subtotal = 0;
+    for (const c of Array.isArray(p.copos) ? p.copos : []) {
+      const tamanho = TAMANHO[c?.tamanho];
+      if (!tamanho) return null;
+      let preco = Number(tamanho.preco) || 0;
+      for (const id of new Set(Array.isArray(c?.itens) ? c.itens : [])) {
+        if (!ITEM[id]) return null;
+        preco += Number(ITEM[id].preco) || 0;
+      }
+      subtotal += preco * Math.max(1, Number(c?.qtd) || 1);
+    }
+    return Math.round((subtotal + (Number(L.taxaEntrega) || 0) - (Number(p.desconto) || 0)) * 100) / 100;
+  }
+  function valorNaoConfere(p) {
+    const esperado = totalPeloCardapio(p);
+    return esperado !== null && Math.abs(esperado - Number(p.total)) > 0.05 ? esperado : null;
+  }
+  function sinalValor(p, classe) {
+    const esperado = valorNaoConfere(p);
+    return esperado === null
+      ? ""
+      : `<span class="${classe} p-alerta" title="Pelo cardápio atual daria ${dinheiro(esperado)}. Confira com o cliente.">Conferir valor</span>`;
   }
 
   function textoPagamento(p) {
@@ -539,12 +729,13 @@
     const sinais = [
       p.observacoes ? `<span class="p-sinal" title="${esc(p.observacoes)}">Obs.</span>` : "",
       p.cupom_ok === false ? `<span class="p-sinal p-alerta" title="O desconto não bate com o cupom. Confira com o cliente.">Conferir cupom</span>` : "",
+      sinalValor(p, "p-sinal"),
     ].join("");
     const etapa = ativo
-      ? `<button type="button" class="p-mini p-etapa p-etapa-${p.status}" data-mudar="${PROXIMO[p.status]}">${ACAO[p.status]}</button>`
-      : `<span class="p-status-chip" data-status="${p.status}">${NOME_STATUS[p.status]} ${horaSP(p.atualizado_em)}</span>`;
+      ? `<button type="button" class="p-mini p-etapa p-etapa-${esc(p.status)}" data-mudar="${PROXIMO[p.status]}">${ACAO[p.status]}</button>`
+      : `<span class="p-status-chip" data-status="${esc(p.status)}">${esc(NOME_STATUS[p.status] || p.status)} ${horaSP(p.atualizado_em)}</span>`;
     return `
-      <div class="p-linha${destaque.has(p.id) ? " chegou" : ""}${aberta || expandida ? " aberta" : ""}" data-pedido="${p.id}" data-status="${p.status}">
+      <div class="p-linha${destaque.has(p.id) ? " chegou" : ""}${aberta || expandida ? " aberta" : ""}" data-pedido="${p.id}" data-status="${esc(p.status)}">
         <div class="p-linha-principal">
           <button type="button" class="p-abrir" data-expandir aria-expanded="${expandida}" title="${expandida ? "Recolher" : "Ver tamanho, frutas e complementos"}">
             <span class="p-pos">${pos ? `${pos}º Pedido` : ""}</span>
@@ -843,13 +1034,14 @@
     const copos = Array.isArray(p.copos) ? p.copos : [];
     const cancelado = p.status === "cancelado";
     const info = [
-      `<span><b>Situação:</b> ${NOME_STATUS[p.status] || p.status}${ATIVOS.includes(p.status) ? "" : ` às ${horaSP(p.atualizado_em)}`}</span>`,
+      `<span><b>Situação:</b> ${esc(NOME_STATUS[p.status] || p.status)}${ATIVOS.includes(p.status) ? "" : ` às ${horaSP(p.atualizado_em)}`}</span>`,
+      sinalValor(p, "p-sinal"),
       `<span><b>Pagamento:</b> ${esc(textoPagamento(p))}</span>`,
       Number(p.desconto) > 0 ? `<span><b>Cupom ${esc(p.cupom || "")}:</b> − ${dinheiro(p.desconto)}</span>` : "",
       p.observacoes ? `<span><b>Obs.:</b> ${esc(p.observacoes)}</span>` : "",
     ].join("");
     return `
-      <div class="p-linha${aberto ? " aberta" : ""}" data-hist="${p.id}" data-status="${p.status}">
+      <div class="p-linha${aberto ? " aberta" : ""}" data-hist="${p.id}" data-status="${esc(p.status)}">
         <button type="button" class="p-abrir p-abrir-hist" data-expandir-hist aria-expanded="${aberto}">
           <span class="p-codigo">#${esc(p.codigo || p.id)}</span>
           <span class="p-data"><b>${diaSP(p.criado_em)}</b> ${horaSP(p.criado_em)}</span>

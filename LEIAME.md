@@ -58,6 +58,20 @@ Os pedidos ficam no **Supabase** (plano grátis). O WhatsApp continua sendo o ca
   - ver, mudar e apagar exige o login da equipe.
 - **Atenção:** o projeto grátis do Supabase pausa se ficar uma semana sem uso. Se isso acontecer, entre em supabase.com e clique em "Restore".
 
+### Segurança do painel
+
+Para entrar no painel são necessárias **duas etapas**: a senha **e** o código de 6 números do app autenticador (Google Authenticator, Microsoft Authenticator ou Authy). O mesmo QR code fica cadastrado nos dois celulares.
+
+- **Quem barra é o banco, não a página.** Sem o código do autenticador **autorizado**, o banco não mostra nem altera nada, mesmo para quem sabe a senha.
+- **Celular de invasor não serve.** Se alguém com a senha cadastrar outro autenticador, ele não funciona.
+- **Valor conferido.** O painel recalcula cada pedido pelo cardápio e marca "Conferir valor" se o total não bater.
+- **Perdeu um celular?** No painel, clique em **"Desconectar todos os aparelhos"** (no fim da página). O acesso cai na hora em todos os aparelhos. Depois, troque a senha.
+- **Perdeu os DOIS celulares** (ou trocou de celular sem passar o autenticador):
+  1. Supabase → **Authentication → Users** → seu usuário → apague o fator de MFA.
+  2. **SQL Editor** → rode `update private.equipe set fator_id = null;`
+  3. Entre no painel: ele mostra um QR code novo para cadastrar de novo.
+- **Dica:** a "chave" em texto que aparece junto do QR code funciona como cópia de segurança. Se quiser guardar, anote **no papel** e deixe em casa. Não guarde em foto nem na nuvem.
+
 ## Logo
 
 Na pasta `logo/`:

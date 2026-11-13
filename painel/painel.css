@@ -95,6 +95,112 @@ h2 {
   height: auto;
 }
 
+/* ---------- verificação em duas etapas ---------- */
+.p-caixa-larga {
+  width: min(100%, 480px);
+}
+.p-input-codigo {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 14px;
+  border: 1.5px solid rgb(255 255 255 / 0.16);
+  border-radius: 14px;
+  background: var(--acai-800);
+  color: var(--ninho);
+  font-size: 1.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+.p-input-codigo::placeholder {
+  color: rgb(184 151 189 / 0.4);
+}
+.p-input-codigo:focus {
+  outline: none;
+  border-color: var(--ouro);
+  box-shadow: 0 0 0 3px rgb(224 184 102 / 0.25);
+}
+.p-passos {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 22px;
+  color: var(--ninho-2);
+}
+.p-passos li {
+  padding-left: 4px;
+}
+.p-passos li::marker {
+  color: var(--ouro);
+  font-weight: 800;
+}
+.p-passos strong {
+  color: var(--ninho);
+}
+.p-passos .p-input-codigo {
+  margin-top: 8px;
+}
+.p-qr {
+  display: grid;
+  place-items: center;
+  width: 216px;
+  min-height: 216px;
+  margin: 10px 0 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--acai-900);
+  font-weight: 700;
+  text-align: center;
+}
+.p-qr img {
+  display: block;
+  width: 200px;
+  height: 200px;
+}
+.p-chave-manual {
+  display: block;
+  font-size: 0.875rem;
+}
+.p-chave-manual code {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--acai-700);
+  color: var(--ninho);
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.p-alerta-caixa {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgb(224 184 102 / 0.4);
+  border-radius: 12px;
+  background: rgb(224 184 102 / 0.1);
+  color: var(--ouro-claro) !important;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+.p-caixa .p-link {
+  justify-self: center;
+}
+.p-rodape-seg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 10px;
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--linha);
+  color: var(--ninho-3);
+  font-size: 0.875rem;
+}
+
 /* ---------- campos e botões ---------- */
 .p-campo {
   display: grid;

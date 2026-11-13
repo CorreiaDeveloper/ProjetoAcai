@@ -51,12 +51,53 @@
     </form>
   </div>
 
+  <!-- 2ª etapa: código do app autenticador -->
+  <div class="p-centro" data-tela="codigo" hidden>
+    <form class="p-caixa" data-form-codigo novalidate>
+      <img class="p-caixa-logo" src="/img/logo-nome.webp" width="520" height="192" alt="Ganath">
+      <h1>Código de verificação</h1>
+      <p>Abra o app autenticador no celular e digite o código de 6 números do <strong>Ganath Painel</strong>.</p>
+      <label class="p-campo">
+        <span>Código</span>
+        <input class="p-input-codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]*" placeholder="000000" required>
+      </label>
+      <p class="p-erro" data-erro-codigo role="alert"></p>
+      <button type="submit" class="p-btn p-btn-ouro p-btn-largo">Confirmar</button>
+      <button type="button" class="p-link" data-sair>Entrar com outra conta</button>
+    </form>
+  </div>
+
+  <!-- Ativar a verificação em duas etapas (primeira vez) -->
+  <div class="p-centro" data-tela="cadastro-2fa" hidden>
+    <form class="p-caixa p-caixa-larga" data-form-cadastro novalidate>
+      <img class="p-caixa-logo" src="/img/logo-nome.webp" width="520" height="192" alt="Ganath">
+      <h1>Ative a verificação em duas etapas</h1>
+      <p>Além da senha, o painel vai pedir um código do celular. Assim, mesmo quem descobrir a senha não entra.</p>
+      <ol class="p-passos">
+        <li>Instale o <strong>Google Authenticator</strong> (ou Microsoft Authenticator / Authy) no seu celular <strong>e no da sua esposa</strong>.</li>
+        <li>
+          Nos <strong>dois celulares</strong>, toque em <strong>+</strong> e escaneie este QR code:
+          <span class="p-qr"><img data-qr alt="QR code para o app autenticador" width="200" height="200" hidden><span data-qr-carregando>Gerando o QR code…</span></span>
+          <span class="p-chave-manual">Não consegue escanear? Escolha "inserir chave" e digite: <code data-chave-secreta></code></span>
+        </li>
+        <li>
+          Digite o código de 6 números que apareceu no app:
+          <input class="p-input-codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]*" placeholder="000000" aria-label="Código de 6 números" required>
+        </li>
+      </ol>
+      <p class="p-alerta-caixa">Este QR code só aparece agora. Escaneie nos dois celulares antes de ativar.</p>
+      <p class="p-erro" data-erro-cadastro role="alert"></p>
+      <button type="submit" class="p-btn p-btn-ouro p-btn-largo">Ativar</button>
+      <button type="button" class="p-link" data-sair>Sair</button>
+    </form>
+  </div>
+
   <!-- Login sem acesso -->
   <div class="p-centro" data-tela="sem-acesso" hidden>
     <div class="p-caixa">
       <img class="p-caixa-logo" src="/img/logo-nome.webp" width="520" height="192" alt="Ganath">
-      <h1>Login sem acesso</h1>
-      <p>O login <strong data-email-sem-acesso></strong> entrou, mas ainda não tem permissão para ver os pedidos.</p>
+      <h1>Acesso negado</h1>
+      <p>O login <strong data-email-sem-acesso></strong> entrou, mas não tem permissão para ver os pedidos, ou o código veio de um autenticador que não é o autorizado.</p>
       <button type="button" class="p-btn p-btn-contorno" data-sair>Sair</button>
     </div>
   </div>
@@ -163,6 +204,11 @@
         <h2 class="p-titulo-lista">Cupons</h2>
         <div class="p-cupons" data-lista-cupons></div>
       </section>
+
+      <footer class="p-rodape-seg">
+        <span>Perdeu um celular ou desconfia de alguém?</span>
+        <button type="button" class="p-link p-perigo" data-sair-todos>Desconectar todos os aparelhos</button>
+      </footer>
     </main>
   </div>
 
