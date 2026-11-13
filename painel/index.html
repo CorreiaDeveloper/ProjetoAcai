@@ -79,6 +79,7 @@
 
     <nav class="p-abas" aria-label="Seções">
       <button type="button" data-aba="fila" aria-current="page">Pedidos <span class="p-contagem" data-contagem-fila hidden></span></button>
+      <button type="button" data-aba="historico">Histórico</button>
       <button type="button" data-aba="cupons">Cupons</button>
     </nav>
 
@@ -87,10 +88,6 @@
       <section data-secao="fila">
         <div class="p-barra">
           <p class="p-resumo" data-resumo></p>
-          <div class="p-segmento" role="group" aria-label="Ordem dos pedidos">
-            <button type="button" data-ordem="chegada" aria-pressed="true">Ordem de chegada</button>
-            <button type="button" data-ordem="predio" aria-pressed="false">Por torre</button>
-          </div>
         </div>
 
         <div class="p-fila">
@@ -111,6 +108,19 @@
             <summary>Entregues e cancelados (últimas 24 h) <span class="p-n" data-n-finalizados></span></summary>
             <div class="p-linhas" data-lista="finalizados"></div>
           </details>
+        </div>
+      </section>
+
+      <!-- HISTÓRICO -->
+      <section data-secao="historico" hidden>
+        <div class="p-barra">
+          <h2 class="p-titulo-secao">Últimas 2 semanas</h2>
+          <p class="p-resumo" data-resumo-historico></p>
+        </div>
+        <div class="p-fila">
+          <div class="p-linhas" data-lista-historico>
+            <p class="p-vazio">Carregando…</p>
+          </div>
         </div>
       </section>
 

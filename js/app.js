@@ -518,14 +518,39 @@
     el.classList.add("pulo");
   }
 
+  // Com a sacola aberta, a página de trás fica parada (no celular, a rolagem
+  // "vazava" da sacola para o site atrás dela).
+  let rolagemGuardada = null;
+  function travarFundo() {
+    if (rolagemGuardada !== null) return;
+    rolagemGuardada = window.scrollY;
+    document.body.style.top = `-${rolagemGuardada}px`;
+    document.documentElement.classList.add("fundo-travado");
+  }
+  function destravarFundo() {
+    if (rolagemGuardada === null) return;
+    const y = rolagemGuardada;
+    rolagemGuardada = null;
+    const html = document.documentElement;
+    html.classList.remove("fundo-travado");
+    document.body.style.top = "";
+    html.style.scrollBehavior = "auto"; // volta para o mesmo lugar sem animar
+    window.scrollTo(0, y);
+    html.style.scrollBehavior = "";
+  }
+
   function abrirSacola() {
     esconderAviso();
     renderSacola();
-    if (!dialogo.open) dialogo.showModal();
+    if (!dialogo.open) {
+      travarFundo();
+      dialogo.showModal();
+    }
   }
 
   function fecharSacola() {
     if (dialogo.open) dialogo.close();
+    destravarFundo();
   }
 
   function irParaMontador() {
@@ -538,6 +563,7 @@
   });
   dialogo.addEventListener("close", () => {
     modoEnviado = false;
+    destravarFundo(); // também quando fecha pelo botão "voltar" ou pela tecla Esc
   });
   $$("[data-abrir-sacola]").forEach((b) => b.addEventListener("click", abrirSacola));
   $("[data-fechar-sacola]").addEventListener("click", fecharSacola);
@@ -687,11 +713,12 @@
         };
         campoCupom.value = cupom.codigo;
         campoCupom.removeAttribute("aria-invalid");
-        if (/cupom/i.test($("[data-erro]").textContent)) $("[data-erro]").textContent = "";
         vibrar(12);
       } else {
-        campoCupom.setAttribute("aria-invalid", "true");
-        mostrarCupom("Cupom não encontrado ou fora da validade.", "erro");
+        // cupom recusado: limpa o campo e diz qual código não valeu
+        campoCupom.value = "";
+        campoCupom.removeAttribute("aria-invalid");
+        mostrarCupom(`Cupom ${codigo} não encontrado ou fora da validade.`, "erro");
       }
     } catch {
       mostrarCupom("Não deu para conferir o cupom agora. Tente de novo em instantes.", "erro");
@@ -716,7 +743,6 @@
   });
   campoCupom.addEventListener("input", () => {
     if (!cupom) mostrarCupom("");
-    if (!campoCupom.value.trim() && /cupom/i.test($("[data-erro]").textContent)) $("[data-erro]").textContent = "";
   });
 
   /* ---------- formulário ---------- */
@@ -797,10 +823,7 @@
         return `O troco precisa ser maior que o total de ${dinheiro(total)}.`;
       }
     }
-    if (PAINEL && !cupom && campoCupom.value.trim()) {
-      campoCupom.focus();
-      return "Toque em Aplicar para usar o cupom (ou apague o código).";
-    }
+    // O cupom nunca trava o pedido: sem cupom aplicado, o pedido vai sem desconto.
     return "";
   }
 

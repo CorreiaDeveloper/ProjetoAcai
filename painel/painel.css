@@ -461,15 +461,6 @@ h2 {
 .p-linhas > * + * {
   border-top: 1px solid var(--linha);
 }
-.p-grupo {
-  margin: 0;
-  padding: 10px 14px 6px;
-  color: var(--ouro-claro);
-  font-size: 0.8125rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
 .p-vazio {
   margin: 0;
   padding: 14px 16px;
@@ -942,6 +933,55 @@ h2 {
   background: none;
 }
 
+/* ---------- histórico ---------- */
+.p-titulo-secao {
+  font-size: 1.75rem;
+}
+.p-abrir-hist {
+  width: 100%;
+  grid-template-columns: 70px 132px minmax(0, 1fr) auto;
+  grid-template-areas: "codigo data quem valor";
+  padding: 8px 14px 8px 12px;
+}
+.p-data {
+  grid-area: data;
+  color: var(--ninho-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.p-data b {
+  color: var(--ninho);
+}
+.p-valor {
+  grid-area: valor;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.p-valor.cancelado b {
+  color: var(--ninho-3);
+  text-decoration: line-through;
+}
+.p-valor .p-seta {
+  margin-left: 2px;
+}
+.p-hist-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0 12px 14px;
+  color: var(--ninho-2);
+  font-size: 0.9375rem;
+}
+.p-hist-info b {
+  color: var(--ninho-3);
+  font-weight: 700;
+}
+
 /* ---------- cupons ---------- */
 .p-cupom-form {
   display: grid;
@@ -1120,13 +1160,6 @@ h2 {
   .p-barra {
     align-items: stretch;
   }
-  .p-segmento:not(.p-desconto .p-segmento) {
-    width: 100%;
-  }
-  .p-segmento:not(.p-desconto .p-segmento) button {
-    flex: 1;
-    justify-content: center;
-  }
   .p-linha-principal {
     grid-template-columns: 1fr 1fr 36px;
     grid-template-areas:
@@ -1173,6 +1206,17 @@ h2 {
   .p-menu {
     align-self: start;
     margin-top: 6px;
+  }
+  .p-abrir-hist {
+    margin-left: 0;
+    padding: 10px 12px;
+  }
+  .p-data {
+    order: 3;
+  }
+  .p-valor {
+    order: 6;
+    margin-left: auto;
   }
   .p-hora {
     display: flex;

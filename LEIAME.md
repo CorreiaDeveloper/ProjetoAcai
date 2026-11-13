@@ -41,7 +41,8 @@ Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `
 
 Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, com um único login para vocês dois).
 
-- **Pedidos:** chegam na hora, com som, numa lista em linhas (nº do pedido, horário, nome, torre e apto). Embaixo de cada um aparece o que o cliente escolheu: tamanho, frutas e complementos. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. Dá para ver em ordem de chegada ou agrupado por torre. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
+- **Pedidos:** chegam na hora, com som, numa lista em linhas por ordem de chegada (nº do pedido, horário, nome, torre e apto). Ao clicar na linha, ela mostra o que o cliente escolheu: tamanho, frutas e complementos. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
+- **Histórico:** os pedidos das últimas 2 semanas, um por linha (código, dia e horário, nome, apto e valor), com o total do período. Ao clicar, mostra os detalhes do pedido. É só para consulta.
 - **Montagem do copo:** o botão "Montagem" mostra as 5 camadas, de baixo para cima: recheio, açaí, recheio, açaí, recheio. O açaí nunca vai no fundo.
   - **Fundo:** caldas + pós.
   - **Meio:** frutas + caldas.

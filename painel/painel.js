@@ -69,7 +69,6 @@
     if (!t) return NaN;
     return Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
   };
-  const compara = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" }).compare;
 
   const ITENS = [...(L.frutas || []), ...(L.acompanhamentos || [])];
   const ITEM = Object.fromEntries(ITENS.map((i) => [i.id, i]));
@@ -234,7 +233,6 @@
   let pedidos = [];
   let conhecidos = null; // ids já vistos (null = ainda não carregou)
   const destaque = new Map(); // id → quando chegou (para piscar o cartão)
-  let ordem = ler("ganath-painel:ordem", "chegada");
   let canal = null;
   let tempoReal = false;
   let falhou = false;
@@ -248,7 +246,6 @@
     rodando = true;
     mostrarTela("painel");
     abrirAba(ler("ganath-painel:aba", "fila"));
-    marcarOrdem();
     atualizarStatusLoja();
     conhecidos = null;
     recarregar();
@@ -283,6 +280,8 @@
     soltarTelaAcesa();
     pedidos = [];
     conhecidos = null;
+    historico = [];
+    historicoAbertos.clear();
   }
 
   let timerRecarga;
@@ -318,6 +317,7 @@
       falhou = false;
       renderFila();
       if (chegaram.length) alertarNovos(chegaram);
+      if (abaAtual === "historico") carregarHistorico();
     } catch {
       falhou = true;
     } finally {
@@ -433,13 +433,7 @@
     if (e.key === "Escape" && menuAberto !== null) fecharMenus();
   });
 
-  /* ---------- desenho da fila ---------- */
-  function ordenar(lista) {
-    if (ordem !== "predio") return lista;
-    return [...lista].sort(
-      (a, b) => compara(a.predio, b.predio) || compara(a.apartamento, b.apartamento) || (a.criado_em < b.criado_em ? -1 : 1),
-    );
-  }
+  /* ---------- desenho da fila (sempre por ordem de chegada) ---------- */
 
   function renderFila() {
     if (!rodando) return;
@@ -448,18 +442,9 @@
     const posicao = new Map(fila.map((p, i) => [p.id, i + 1]));
 
     for (const st of ATIVOS) {
-      const lista = ordenar(ativos.filter((p) => p.status === st));
+      const lista = ativos.filter((p) => p.status === st);
       const alvo = $(`[data-lista="${st}"]`);
-      let html = "";
-      let predioAtual = null;
-      for (const p of lista) {
-        if (ordem === "predio" && p.predio !== predioAtual) {
-          predioAtual = p.predio;
-          html += `<p class="p-grupo">Torre ${esc(p.predio)}</p>`;
-        }
-        html += htmlLinha(p, posicao.get(p.id));
-      }
-      alvo.innerHTML = html || `<p class="p-vazio">${VAZIO[st]}</p>`;
+      alvo.innerHTML = lista.map((p) => htmlLinha(p, posicao.get(p.id))).join("") || `<p class="p-vazio">${VAZIO[st]}</p>`;
       $(`[data-coluna="${st}"] [data-n]`).textContent = lista.length || "";
     }
 
@@ -628,25 +613,15 @@
       : "<strong>Hoje:</strong> nenhum pedido ainda";
   }
 
-  /* ---------- ordem ---------- */
-  function marcarOrdem() {
-    $$("[data-ordem]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ordem === ordem)));
-  }
-  $$("[data-ordem]").forEach((b) =>
-    b.addEventListener("click", () => {
-      ordem = b.dataset.ordem;
-      guardar("ganath-painel:ordem", ordem);
-      marcarOrdem();
-      renderFila();
-    }),
-  );
-
   /* ---------- abas ---------- */
+  let abaAtual = "fila";
   function abrirAba(nome) {
-    if (!["fila", "cupons"].includes(nome)) nome = "fila";
+    if (!["fila", "historico", "cupons"].includes(nome)) nome = "fila";
+    abaAtual = nome;
     $$("[data-aba]").forEach((b) => (b.dataset.aba === nome ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
     $$("[data-secao]").forEach((s) => (s.hidden = s.dataset.secao !== nome));
     guardar("ganath-painel:aba", nome);
+    if (nome === "historico" && rodando) carregarHistorico();
   }
   $$("[data-aba]").forEach((b) => b.addEventListener("click", () => abrirAba(b.dataset.aba)));
 
@@ -812,6 +787,87 @@
     if (document.visibilityState !== "visible" || !rodando) return;
     aplicarTelaAcesa();
     recarregar();
+  });
+
+  /* ============================================================
+     HISTÓRICO (últimas 2 semanas, só para consulta)
+     ============================================================ */
+  let historico = [];
+  const historicoAbertos = new Set();
+  let carregandoHistorico = false;
+
+  const fmtDia = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit" });
+  function diaSP(iso) {
+    // "sex., 13/11" → "Sex 13/11"
+    const t = fmtDia.format(new Date(iso)).replace(/[.,]/g, "").replace(/\s+/g, " ").trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  async function carregarHistorico() {
+    if (carregandoHistorico) return;
+    carregandoHistorico = true;
+    try {
+      const desde = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const { data, error } = await sb
+        .from("pedidos")
+        .select("*")
+        .gte("criado_em", desde)
+        .order("criado_em", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      historico = data;
+      for (const id of historicoAbertos) if (!historico.some((p) => p.id === id)) historicoAbertos.delete(id);
+      renderHistorico();
+    } catch {
+      if (!historico.length) $("[data-lista-historico]").innerHTML = `<p class="p-vazio">Não deu para carregar o histórico. Confira a internet.</p>`;
+    } finally {
+      carregandoHistorico = false;
+    }
+  }
+
+  function renderHistorico() {
+    const validos = historico.filter((p) => p.status !== "cancelado");
+    const soma = validos.reduce((s, p) => s + Number(p.total || 0), 0);
+    $("[data-resumo-historico]").innerHTML = validos.length
+      ? `${validos.length} ${validos.length === 1 ? "pedido" : "pedidos"} · <strong>${dinheiro(soma)}</strong>${
+          historico.length > validos.length ? ` <span class="p-nada">(sem contar ${historico.length - validos.length} cancelado${historico.length - validos.length > 1 ? "s" : ""})</span>` : ""
+        }`
+      : "";
+    $("[data-lista-historico]").innerHTML = historico.length
+      ? historico.map(htmlHistorico).join("")
+      : `<p class="p-vazio">Nenhum pedido nas últimas 2 semanas.</p>`;
+  }
+
+  function htmlHistorico(p) {
+    const aberto = historicoAbertos.has(p.id);
+    const copos = Array.isArray(p.copos) ? p.copos : [];
+    const cancelado = p.status === "cancelado";
+    const info = [
+      `<span><b>Situação:</b> ${NOME_STATUS[p.status] || p.status}${ATIVOS.includes(p.status) ? "" : ` às ${horaSP(p.atualizado_em)}`}</span>`,
+      `<span><b>Pagamento:</b> ${esc(textoPagamento(p))}</span>`,
+      Number(p.desconto) > 0 ? `<span><b>Cupom ${esc(p.cupom || "")}:</b> − ${dinheiro(p.desconto)}</span>` : "",
+      p.observacoes ? `<span><b>Obs.:</b> ${esc(p.observacoes)}</span>` : "",
+    ].join("");
+    return `
+      <div class="p-linha${aberto ? " aberta" : ""}" data-hist="${p.id}" data-status="${p.status}">
+        <button type="button" class="p-abrir p-abrir-hist" data-expandir-hist aria-expanded="${aberto}">
+          <span class="p-codigo">#${esc(p.codigo || p.id)}</span>
+          <span class="p-data"><b>${diaSP(p.criado_em)}</b> ${horaSP(p.criado_em)}</span>
+          <span class="p-quem"><strong>${esc(p.nome)}</strong> <span>Torre ${esc(p.predio)} · Apto ${esc(p.apartamento)}</span></span>
+          <span class="p-valor${cancelado ? " cancelado" : ""}">${cancelado ? `<span class="p-sinal p-alerta">Cancelado</span> ` : ""}<b>${dinheiro(p.total)}</b><i class="p-seta" aria-hidden="true"></i></span>
+        </button>
+        ${aberto ? `<div class="p-escolhas">${copos.map(htmlEscolha).join("")}</div><p class="p-hist-info">${info}</p>` : ""}
+      </div>`;
+  }
+
+  $("[data-lista-historico]").addEventListener("click", (e) => {
+    const botao = e.target.closest("[data-expandir-hist]");
+    if (!botao) return;
+    const id = Number(botao.closest("[data-hist]").dataset.hist);
+    if (historicoAbertos.has(id)) historicoAbertos.delete(id);
+    else historicoAbertos.add(id);
+    renderHistorico();
+    $(`[data-hist="${id}"] [data-expandir-hist]`)?.focus({ preventScroll: true });
   });
 
   /* ============================================================

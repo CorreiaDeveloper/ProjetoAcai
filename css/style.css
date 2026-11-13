@@ -1085,7 +1085,20 @@ h2 {
 .sacola[open] {
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain;
   animation: sacola-sobe 0.42s var(--suave);
+}
+/* sacola aberta: a página de trás fica parada (o JS guarda e devolve a posição) */
+html.fundo-travado {
+  overflow: hidden;
+  scroll-behavior: auto;
+}
+html.fundo-travado body {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
 }
 .sacola::backdrop {
   background: rgb(10 0 14 / 0.62);
