@@ -541,6 +541,7 @@
 
   function abrirSacola() {
     esconderAviso();
+    atualizarStatus(); // aviso de "fechado" sempre em dia na hora de pedir
     renderSacola();
     if (!dialogo.open) {
       travarFundo();
@@ -691,7 +692,27 @@
     });
   }
 
-  async function aplicarCupom() {
+  // Cupons de "uma vez por cliente" já usados neste celular.
+  // (O banco também confere pelo apartamento, que é o que vale de verdade.)
+  const cuponsUsadosAqui = () => {
+    const lista = ler("ganath:cupons-usados", []);
+    return Array.isArray(lista) ? lista : [];
+  };
+  function marcarCupomUsado(codigo) {
+    const lista = cuponsUsadosAqui().filter((c) => c !== codigo);
+    lista.push(codigo);
+    guardar("ganath:cupons-usados", lista.slice(-50));
+  }
+
+  // cupom recusado: limpa o campo e diz o motivo
+  function recusarCupom(texto) {
+    cupom = null;
+    campoCupom.value = "";
+    campoCupom.removeAttribute("aria-invalid");
+    mostrarCupom(texto, "erro");
+  }
+
+  async function aplicarCupom({ silencioso = false } = {}) {
     const codigo = campoCupom.value.replace(/\s+/g, "").toUpperCase();
     if (!codigo) {
       mostrarCupom("Digite o código do cupom.", "erro");
@@ -699,34 +720,50 @@
       return;
     }
     botaoCupom.disabled = true;
-    mostrarCupom("Conferindo o cupom…");
+    if (!silencioso) mostrarCupom("Conferindo o cupom…");
     try {
-      const resp = await chamarPainel("rpc/validar_cupom", { p_codigo: codigo });
+      const resp = await chamarPainel("rpc/conferir_cupom", {
+        p_codigo: codigo,
+        p_predio: form.elements.predio.value.trim() || null,
+        p_apartamento: form.elements.apto.value.trim() || null,
+      });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const c = await resp.json();
-      if (c && c.codigo) {
-        cupom = {
-          codigo: c.codigo,
-          tipo: c.tipo,
-          valor: Number(c.valor),
-          pedido_minimo: c.pedido_minimo == null ? null : Number(c.pedido_minimo),
-        };
-        campoCupom.value = cupom.codigo;
-        campoCupom.removeAttribute("aria-invalid");
-        vibrar(12);
+      if (c && c.erro === "ja_usado") {
+        recusarCupom(`O cupom ${codigo} já foi usado no seu apartamento. Ele vale uma vez por cliente.`);
+      } else if (c && c.codigo) {
+        if (c.uso_unico && cuponsUsadosAqui().includes(c.codigo)) {
+          recusarCupom(`Você já usou o cupom ${c.codigo} neste celular. Ele vale uma vez por cliente.`);
+        } else {
+          cupom = {
+            codigo: c.codigo,
+            tipo: c.tipo,
+            valor: Number(c.valor),
+            pedido_minimo: c.pedido_minimo == null ? null : Number(c.pedido_minimo),
+            uso_unico: !!c.uso_unico,
+          };
+          campoCupom.value = cupom.codigo;
+          campoCupom.removeAttribute("aria-invalid");
+          if (!silencioso) vibrar(12);
+        }
       } else {
-        // cupom recusado: limpa o campo e diz qual código não valeu
-        campoCupom.value = "";
-        campoCupom.removeAttribute("aria-invalid");
-        mostrarCupom(`Cupom ${codigo} não encontrado ou fora da validade.`, "erro");
+        recusarCupom(`Cupom ${codigo} não encontrado ou fora da validade.`);
       }
     } catch {
-      mostrarCupom("Não deu para conferir o cupom agora. Tente de novo em instantes.", "erro");
+      // sem internet: na conferência silenciosa mantém o cupom (o banco confere de novo ao receber o pedido)
+      if (!silencioso) mostrarCupom("Não deu para conferir o cupom agora. Tente de novo em instantes.", "erro");
     } finally {
       botaoCupom.disabled = false;
       atualizarBotaoCupom();
       atualizarTotais();
     }
+  }
+
+  // Trocou a torre ou o apartamento depois de aplicar? Confere de novo.
+  for (const nome of ["predio", "apto"]) {
+    form.elements[nome].addEventListener("change", () => {
+      if (cupom && cupom.uso_unico) aplicarCupom({ silencioso: true });
+    });
   }
 
   botaoCupom.addEventListener("click", () => {
@@ -915,6 +952,7 @@
     const url = `https://wa.me/${String(L.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(montarMensagem(codigo))}`;
     $("[data-link-pedido]").href = url;
     enviarAoPainel(codigo, calcularTotais());
+    if (cupom && cupom.uso_unico) marcarCupomUsado(cupom.codigo); // este celular não usa de novo
     guardar("ganath:ultimo", {
       data: Date.now(),
       copos: sacola.map(({ tamanho, itens, qtd }) => ({ tamanho, itens, qtd })),
@@ -958,60 +996,35 @@
      Aberto/fechado, pedir de novo e festa de frutas
      ============================================================ */
 
-  /* ---------- aberto / fechado pelo horário de São Paulo ---------- */
-  const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-  const minutos = (hhmm) => {
-    const [h, m] = String(hhmm).split(":").map(Number);
-    return h * 60 + (m || 0);
-  };
-  const horaTexto = (mins) =>
-    mins >= 1440 ? "meia-noite" : `${Math.floor(mins / 60)}h${mins % 60 ? String(mins % 60).padStart(2, "0") : ""}`;
+  /* ---------- aberto / fechado: vocês ligam e desligam pelo painel ---------- */
+  let statusAtual = null; // { aberto: true | false }, ou null se não deu para saber
 
-  function agoraNaLoja() {
-    const partes = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Sao_Paulo",
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).formatToParts(new Date());
-    const v = (t) => partes.find((p) => p.type === t)?.value;
-    return {
-      dia: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(v("weekday")),
-      min: Number(v("hour")) * 60 + Number(v("minute")),
-    };
+  async function lerStatusLoja() {
+    if (!PAINEL) return null;
+    try {
+      const resp = await fetch(`${PAINEL.url.replace(/\/+$/, "")}/rest/v1/loja?select=aberta&id=eq.1`, {
+        headers: { apikey: PAINEL.chave },
+        cache: "no-store",
+      });
+      if (!resp.ok) return statusAtual; // mantém o último que se sabia
+      const [linha] = await resp.json();
+      return linha ? { aberto: !!linha.aberta } : null;
+    } catch {
+      return statusAtual; // sem internet: mantém o último que se sabia
+    }
   }
 
-  function statusLoja() {
-    const F = L.funcionamento;
-    if (!F || !Array.isArray(F.dias) || !F.dias.length) return null;
-    const { dia, min } = agoraNaLoja();
-    const abre = minutos(F.abre);
-    const fecha = minutos(F.fecha);
-    if (F.dias.includes(dia) && min >= abre && min < fecha) {
-      return { aberto: true, texto: `Aberto agora, até ${fecha >= 1440 ? "meia-noite" : `as ${horaTexto(fecha)}`}` };
-    }
-    for (let k = 0; k < 8; k++) {
-      const d = (dia + k) % 7;
-      if (!F.dias.includes(d) || (k === 0 && min >= abre)) continue;
-      const quando = k === 0 ? "hoje" : k === 1 ? "amanhã" : DIAS[d];
-      return { aberto: false, quando, hora: horaTexto(abre), texto: `Fechado agora. Abre ${quando} às ${horaTexto(abre)}` };
-    }
-    return null;
-  }
-
-  let statusAtual = null;
-  function atualizarStatus() {
-    statusAtual = statusLoja();
+  async function atualizarStatus() {
+    statusAtual = await lerStatusLoja();
     const el = $("[data-status]");
-    el.hidden = !statusAtual;
     const aviso = $("[data-aviso-fechado]");
+    el.hidden = !statusAtual;
     aviso.hidden = !statusAtual || statusAtual.aberto;
     if (!statusAtual) return;
     el.classList.toggle("aberto", statusAtual.aberto);
-    $("[data-status-texto]").textContent = statusAtual.texto;
+    $("[data-status-texto]").textContent = statusAtual.aberto ? "Aberto agora" : "Fechado no momento";
     if (!statusAtual.aberto) {
-      aviso.textContent = `Estamos fechados agora. Pode enviar o pedido mesmo assim: a gente responde ${statusAtual.quando} a partir das ${statusAtual.hora}.`;
+      aviso.textContent = "Estamos fechados agora. Pode enviar o pedido mesmo assim: a gente responde assim que abrir.";
     }
   }
 
@@ -1096,7 +1109,9 @@
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && celebrar) {
+    if (document.visibilityState !== "visible") return;
+    atualizarStatus(); // a loja pode ter aberto/fechado enquanto a pessoa estava em outro app
+    if (celebrar) {
       celebrar = false;
       setTimeout(festa, 300);
     }
@@ -1134,6 +1149,6 @@
   atualizarMontagem();
   marcarAba(0);
   atualizarStatus();
-  setInterval(atualizarStatus, 60 * 1000);
+  setInterval(atualizarStatus, 30 * 1000);
   renderRepetir();
 })();

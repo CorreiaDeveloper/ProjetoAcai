@@ -419,13 +419,15 @@
     rodando = true;
     mostrarTela("painel");
     abrirAba(ler("ganath-painel:aba", "fila"));
-    atualizarStatusLoja();
     conhecidos = null;
     recarregar();
     carregarCupons();
+    carregarLoja();
     canal = sb
       .channel("painel-pedidos")
       .on("postgres_changes", { event: "*", schema: "public", table: "pedidos" }, agendarRecarga)
+      // se o outro aparelho abrir/fechar a loja, este atualiza na hora
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "loja" }, () => carregarLoja())
       .subscribe((status) => {
         tempoReal = status === "SUBSCRIBED";
         atualizarConexao();
@@ -438,7 +440,7 @@
     }, 10000);
     timerRelogio = setInterval(() => {
       renderFila();
-      atualizarStatusLoja();
+      carregarLoja();
     }, 30000);
     aplicarTelaAcesa();
   }
@@ -455,6 +457,7 @@
     conhecidos = null;
     historico = [];
     historicoAbertos.clear();
+    loja = null;
   }
 
   let timerRecarga;
@@ -651,7 +654,7 @@
     const e = [];
     if (p.loja_fechada) e.push(`<span class="p-etiqueta">Enviado com a loja fechada</span>`);
     if (p.cupom_ok === false)
-      e.push(`<span class="p-etiqueta p-alerta" title="O desconto não bate com o cupom. Confira com o cliente.">Conferir cupom</span>`);
+      e.push(`<span class="p-etiqueta p-alerta" title="O desconto não bate com o cupom, ou este apartamento já tinha usado esse cupom. Confira com o cliente.">Conferir cupom</span>`);
     const esperado = valorNaoConfere(p);
     if (esperado !== null)
       e.push(`<span class="p-etiqueta p-alerta">Conferir valor: pelo cardápio daria ${dinheiro(esperado)}</span>`);
@@ -741,7 +744,7 @@
     const voltar = ANTERIOR[p.status];
     const sinais = [
       p.observacoes ? `<span class="p-sinal" title="${esc(p.observacoes)}">Obs.</span>` : "",
-      p.cupom_ok === false ? `<span class="p-sinal p-alerta" title="O desconto não bate com o cupom. Confira com o cliente.">Conferir cupom</span>` : "",
+      p.cupom_ok === false ? `<span class="p-sinal p-alerta" title="O desconto não bate com o cupom, ou este apartamento já tinha usado esse cupom. Confira com o cliente.">Conferir cupom</span>` : "",
       sinalValor(p, "p-sinal"),
     ].join("");
     const etapa = ativo
@@ -845,47 +848,56 @@
   }
   addEventListener("online", () => recarregar());
 
-  /* ---------- loja aberta / fechada ---------- */
-  const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-  const minutos = (hhmm) => {
-    const [h, m] = String(hhmm).split(":").map(Number);
-    return h * 60 + (m || 0);
-  };
-  const horaTexto = (mins) =>
-    mins >= 1440 ? "meia-noite" : `${Math.floor(mins / 60)}h${mins % 60 ? String(mins % 60).padStart(2, "0") : ""}`;
-  function atualizarStatusLoja() {
-    const F = L.funcionamento;
-    const el = $("[data-status-loja]");
-    if (!F || !Array.isArray(F.dias) || !F.dias.length) {
-      el.hidden = true;
-      return;
-    }
-    const partes = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Sao_Paulo",
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).formatToParts(new Date());
-    const v = (t) => partes.find((p) => p.type === t)?.value;
-    const dia = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(v("weekday"));
-    const min = Number(v("hour")) * 60 + Number(v("minute"));
-    const abre = minutos(F.abre);
-    const fecha = minutos(F.fecha);
-    const aberto = F.dias.includes(dia) && min >= abre && min < fecha;
-    el.classList.toggle("aberto", aberto);
-    if (aberto) {
-      el.textContent = `Loja aberta até ${horaTexto(fecha)}`;
-      return;
-    }
-    for (let k = 0; k < 8; k++) {
-      const d = (dia + k) % 7;
-      if (!F.dias.includes(d) || (k === 0 && min >= abre)) continue;
-      el.textContent = `Loja fechada · abre ${k === 0 ? "hoje" : k === 1 ? "amanhã" : DIAS[d]} às ${horaTexto(abre)}`;
-      return;
-    }
-    el.textContent = "Loja fechada";
+  /* ---------- loja aberta / fechada (botão no topo) ----------
+     O site lê esta situação para mostrar "Aberto agora" ou "Fechado no momento". */
+  let loja = null; // { aberta, atualizado_em } ou null enquanto não carregou
+  let mudandoLoja = false;
+
+  async function carregarLoja() {
+    const { data, error } = await sb.from("loja").select("aberta, atualizado_em").eq("id", 1);
+    if (!error && Array.isArray(data) && data[0] && !mudandoLoja) loja = data[0];
+    renderLoja();
   }
+
+  function renderLoja() {
+    const b = $("[data-loja]");
+    if (!loja) {
+      b.dataset.estado = "";
+      b.disabled = true;
+      $("[data-loja-texto]").textContent = "Loja…";
+      $("[data-loja-dica]").textContent = "";
+      return;
+    }
+    b.disabled = mudandoLoja;
+    b.dataset.estado = loja.aberta ? "aberta" : "fechada";
+    b.setAttribute("aria-pressed", String(loja.aberta));
+    $("[data-loja-texto]").textContent = loja.aberta ? "Loja ABERTA" : "Loja FECHADA";
+    const desde = loja.atualizado_em ? ` desde ${dataSP(new Date(loja.atualizado_em)) === dataSP(new Date()) ? horaSP(loja.atualizado_em) : `${diaSP(loja.atualizado_em)} ${horaSP(loja.atualizado_em)}`}` : "";
+    $("[data-loja-dica]").textContent = `${loja.aberta ? "aberta" : "fechada"}${desde} · toque para ${loja.aberta ? "fechar" : "abrir"}`;
+  }
+
+  $("[data-loja]").addEventListener("click", async () => {
+    if (!loja || mudandoLoja) return;
+    const abrir = !loja.aberta;
+    const pergunta = abrir
+      ? "ABRIR a loja?\n\nO site passa a mostrar \"Aberto agora\" para os clientes."
+      : "FECHAR a loja?\n\nO site passa a mostrar \"Fechado no momento\". Os clientes ainda conseguem mandar pedido, avisados de que vocês respondem quando abrir.";
+    if (!confirm(pergunta)) return;
+    const antes = loja;
+    mudandoLoja = true;
+    loja = { aberta: abrir, atualizado_em: new Date().toISOString() };
+    renderLoja();
+    const { error } = await sb.from("loja").update({ aberta: abrir }).eq("id", 1);
+    mudandoLoja = false;
+    if (error) {
+      loja = antes;
+      toast("Não deu para mudar. Confira a internet e tente de novo.");
+    } else {
+      vibrar(20);
+      toast(abrir ? "Loja aberta! O site já mostra \"Aberto agora\"." : "Loja fechada. O site já mostra \"Fechado no momento\".");
+    }
+    carregarLoja();
+  });
 
   /* ---------- som de novo pedido ---------- */
   let audio = null;
@@ -1113,6 +1125,7 @@
         const regras = [
           c.pedido_minimo ? `pedidos a partir de ${dinheiro(c.pedido_minimo)}` : "",
           c.valido_ate ? `vale até ${dataBR(c.valido_ate)}` : "sem data para acabar",
+          c.uso_unico === false ? "pode repetir" : "1 vez por cliente",
           c.usos_max ? `usado ${c.usos} de ${c.usos_max}` : `usado ${c.usos} ${c.usos === 1 ? "vez" : "vezes"}`,
         ].filter(Boolean);
         return `
@@ -1191,6 +1204,7 @@
     const minimo = f.minimo.value.trim() ? numero(f.minimo.value) : null;
     const usos = f.usos.value.trim() ? Number(f.usos.value.replace(/\D/g, "")) : null;
     const validade = f.validade.value || null;
+    const usoUnico = f.uso_unico.checked;
 
     if (!/^[A-Z0-9]{3,20}$/.test(codigo)) return falha("O código precisa ter de 3 a 20 letras ou números (sem espaço e sem acento).", f.codigo);
     if (!(valor > 0)) return falha("Informe quanto é o desconto.", f.valor);
@@ -1208,6 +1222,7 @@
       valor: Math.round(valor * 100) / 100,
       pedido_minimo: minimo,
       valido_ate: validade,
+      uso_unico: usoUnico,
       usos_max: usos,
     });
     botao.disabled = false;

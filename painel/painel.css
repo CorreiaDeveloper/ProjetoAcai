@@ -345,18 +345,58 @@ h2 {
   font-size: 1.5rem;
   font-weight: 700;
 }
-.p-status-loja {
-  margin: 0;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgb(255 156 174 / 0.12);
-  color: var(--vermelho);
-  font-size: 0.875rem;
-  font-weight: 700;
+/* botão abrir / fechar a loja */
+.p-loja {
+  --cor: var(--ninho-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 16px 6px 12px;
+  border: 1.5px solid var(--cor);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cor) 12%, transparent);
+  color: var(--ninho);
+  text-align: left;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
 }
-.p-status-loja.aberto {
-  background: rgb(142 230 168 / 0.12);
-  color: var(--verde);
+.p-loja[data-estado="aberta"] {
+  --cor: var(--verde);
+}
+.p-loja[data-estado="fechada"] {
+  --cor: var(--vermelho);
+}
+.p-loja:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cor) 22%, transparent);
+}
+.p-loja:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+.p-loja-ponto {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cor);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cor) 25%, transparent);
+}
+.p-loja-textos {
+  display: grid;
+  line-height: 1.2;
+}
+.p-loja-textos strong {
+  color: var(--cor);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.p-loja-textos small {
+  color: var(--ninho-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 .p-topo-acoes {
   display: flex;
@@ -1114,6 +1154,32 @@ h2 {
   display: flex;
   gap: 8px;
 }
+.p-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  background: var(--acai-800);
+  cursor: pointer;
+}
+.p-check input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 1px 0 0;
+  accent-color: var(--ouro);
+  cursor: pointer;
+}
+.p-check span {
+  display: grid;
+  gap: 2px;
+}
+.p-check small {
+  color: var(--ninho-3);
+  font-size: 0.875rem;
+}
 .p-desconto .p-segmento {
   flex: none;
   align-self: center;
@@ -1252,6 +1318,9 @@ h2 {
 @media (max-width: 560px) {
   .p-topo {
     position: static;
+  }
+  .p-loja {
+    width: 100%;
   }
   .p-marca img {
     height: 28px;

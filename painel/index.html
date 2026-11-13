@@ -109,7 +109,10 @@
         <img src="/img/logo-nome.webp" width="520" height="192" alt="Ganath">
         <span>Painel</span>
       </div>
-      <p class="p-status-loja" data-status-loja></p>
+      <button type="button" class="p-loja" data-loja aria-pressed="false" disabled>
+        <span class="p-loja-ponto" aria-hidden="true"></span>
+        <span class="p-loja-textos"><strong data-loja-texto>Loja…</strong><small data-loja-dica></small></span>
+      </button>
       <div class="p-topo-acoes">
         <span class="p-conexao" data-conexao role="status"></span>
         <button type="button" class="p-chip" data-som aria-pressed="true">Som</button>
@@ -197,6 +200,13 @@
               <input name="usos" inputmode="numeric" placeholder="Sem limite">
             </label>
           </div>
+          <label class="p-check">
+            <input type="checkbox" name="uso_unico" checked>
+            <span>
+              <strong>Cada cliente só pode usar uma vez</strong>
+              <small>Conferido pelo apartamento e pelo celular. Desmarque se a mesma pessoa puder usar o cupom várias vezes.</small>
+            </span>
+          </label>
           <p class="p-erro" data-erro-cupom role="alert"></p>
           <button type="submit" class="p-btn p-btn-ouro">Criar cupom</button>
         </form>

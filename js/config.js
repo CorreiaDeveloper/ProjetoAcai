@@ -16,14 +16,10 @@ window.LOJA = {
 
   endereco: "Rua José Manoel da Fonseca Junior, 105",
 
-  // Horário de funcionamento. Deixe "" para não mostrar.
-  // Exemplo: "Todos os dias, das 14h às 22h"
-  horario: "Sexta, sábado e domingo, das 12h à meia-noite",
-
-  // O mesmo horário, para o site mostrar "Aberto agora" ou "Fechado" sozinho.
-  // dias: 0 = domingo, 1 = segunda, 2 = terça, 3 = quarta, 4 = quinta, 5 = sexta, 6 = sábado
-  // fecha "24:00" = meia-noite. Para desligar o aviso, apague este bloco.
-  funcionamento: { dias: [5, 6, 0], abre: "12:00", fecha: "24:00" },
+  // "Aberto agora" / "Fechado" agora é pelo botão do PAINEL (não tem mais horário fixo).
+  // Se quiser mostrar um texto sobre horário na página, escreva aqui. Deixe "" para não mostrar.
+  // Exemplo: "Geralmente nos fins de semana, à tarde e à noite"
+  horario: "",
 
   // Taxa de entrega em reais (0 = grátis).
   taxaEntrega: 0,

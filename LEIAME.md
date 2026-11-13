@@ -13,8 +13,8 @@ Dê dois cliques em `index.html`. Ele abre no navegador e funciona sem instalar 
 | Número que recebe os pedidos | `whatsapp`: 55 + DDD + número, só dígitos |
 | Número que aparece no rodapé | `telefoneExibicao` |
 | Endereço | `endereco` |
-| Horário de funcionamento (texto) | `horario` (deixe `""` para não mostrar) |
-| Aviso "Aberto agora" / "Fechado" | `funcionamento`: dias (0 = domingo … 6 = sábado), `abre` e `fecha` |
+| Texto opcional sobre horário | `horario` (deixe `""` para não mostrar) |
+| Aviso "Aberto agora" / "Fechado" | **no painel**, pelo botão "Loja ABERTA / FECHADA" (não fica mais no arquivo) |
 | Taxa de entrega | `taxaEntrega` (`0` = grátis) |
 | Perguntar a forma de pagamento | `formasPagamento`: deixe `[]` para não perguntar, ou ex.: `["Pix", "Dinheiro"]` |
 | Preço dos copos | `tamanhos` |
@@ -29,7 +29,7 @@ Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `
 
 ## Recursos do site
 
-- **Aberto / fechado automático:** usa o horário de São Paulo. Pedido feito com a loja fechada pode ser enviado, mas chega marcado no WhatsApp.
+- **Aberto / fechado:** vocês abrem e fecham a loja pelo botão do painel, e o site mostra "Aberto agora" ou "Fechado no momento". Com a loja fechada, o cliente ainda pode mandar o pedido: ele chega marcado no WhatsApp e no painel, e o cliente é avisado de que vocês respondem quando abrirem.
 - **Sacola esvazia ao enviar:** quando a pessoa toca em "Enviar pedido pelo WhatsApp", a sacola fica vazia. Nome, Torre e apartamento continuam lembrados para o próximo pedido.
 - **Pedir de novo:** o celular de cada morador lembra o último pedido, que pode ser repetido com um toque.
 - **Festa de frutas:** quando a pessoa volta do WhatsApp depois de enviar, as frutas do pedido "explodem" na tela.
@@ -41,6 +41,7 @@ Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `
 
 Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, com um único login para vocês dois).
 
+- **Loja ABERTA / FECHADA:** é o botão no topo. Toque, confirme, e o site muda na hora. Se o outro aparelho estiver com o painel aberto, ele também atualiza sozinho. O site não mostra desde quando a loja está fechada, só se está aberta ou não.
 - **Pedidos:** chegam na hora, com som, numa lista em linhas por ordem de chegada (nº do pedido, horário, nome, torre e apto). Ao clicar na linha, ela mostra o que o cliente escolheu: tamanho, frutas e complementos. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
 - **Histórico:** os pedidos das últimas 2 semanas, um por linha (código, dia e horário, nome, apto e valor), com o total do período. Ao clicar, mostra os detalhes do pedido. É só para consulta.
 - **Montagem do copo:** o botão "Montagem" mostra as 5 camadas, de baixo para cima: recheio, açaí, recheio, açaí, recheio. O açaí nunca vai no fundo.
@@ -49,6 +50,10 @@ Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, co
   - **Topo:** pós + balas, confete e crocantes.
   - Em quais camadas cada item vai está no começo de `painel/painel.js` (`CAMADAS_DO_ITEM`).
 - **Cupons:** criar, ligar/desligar, apagar e copiar o convite para mandar no WhatsApp. Pode ter porcentagem ou valor em reais, pedido mínimo, data final e limite de usos.
+  - **"Cada cliente só pode usar uma vez"** (vem marcado): o cupom vale uma vez por apartamento.
+  - O banco confere pela torre e pelo apartamento, entendendo "Torre 2 / Apto 34" e "2 / 034" como o mesmo lugar. O celular também lembra.
+  - Pedido cancelado devolve o cupom para aquele apartamento.
+  - Desmarque a caixinha para o cupom poder ser repetido.
 - **No celular:** "Adicionar à tela inicial" cria o ícone "Painel". O botão "Manter tela acesa" evita que a tela apague na bancada.
 
 Os pedidos ficam no **Supabase** (plano grátis). O WhatsApp continua sendo o caminho principal: se o banco cair, o pedido chega pelo WhatsApp do mesmo jeito.
