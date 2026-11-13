@@ -119,9 +119,18 @@
   }
 
   /* ---------- telas ---------- */
+  let carregandoDesde = Date.now();
   function mostrarTela(nome) {
     $$("[data-tela]").forEach((t) => (t.hidden = t.dataset.tela !== nome));
+    carregandoDesde = nome === "carregando" ? Date.now() : 0;
   }
+  // Rede de segurança: nunca fica preso em "Carregando…" para sempre.
+  setInterval(() => {
+    if (carregandoDesde && Date.now() - carregandoDesde > 15000) {
+      carregandoDesde = 0;
+      erroFatal("Está demorando para abrir. Confira a internet e toque em Recarregar.");
+    }
+  }, 3000);
   function erroFatal(texto) {
     $("[data-erro-texto]").textContent = texto;
     mostrarTela("erro");
@@ -179,27 +188,31 @@
       return;
     }
     const chave = `${sessao.user.id}:${nivel.currentLevel}`;
-    if (chave === estadoAtual) return; // só renovou o acesso
-    estadoAtual = chave;
+    if (chave === estadoAtual) return; // já foi tratado até o fim (só renovou o acesso)
 
     if (nivel.currentLevel !== "aal2") {
+      estadoAtual = chave;
       pararPainel();
       if (nivel.nextLevel === "aal2") mostrarCodigo();
       else iniciarCadastro2fa();
       return;
     }
 
-    mostrarTela("carregando");
+    if (!rodando) mostrarTela("carregando");
     // Primeira vez depois de ativar: autoriza este autenticador (só se for o único da conta).
     await sb.rpc("fixar_meu_fator");
     const { data: ok, error } = await sb.rpc("sou_da_equipe");
+    // Chegou um aviso mais novo no meio do caminho? Ele refaz tudo (por isso
+    // "estadoAtual" só é marcado no fim; antes ficava preso em "Carregando…").
     if (minha !== geracao) return;
     if (error) {
       estadoAtual = null;
       erroFatal("Não deu para conferir o acesso. Confira a internet e recarregue a página.");
       return;
     }
+    estadoAtual = chave;
     if (!ok) {
+      pararPainel();
       $("[data-email-sem-acesso]").textContent = sessao.user.email || "";
       mostrarTela("sem-acesso");
       return;
