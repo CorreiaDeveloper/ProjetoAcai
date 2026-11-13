@@ -458,6 +458,7 @@
     historico = [];
     historicoAbertos.clear();
     loja = null;
+    pendentes.clear();
   }
 
   let timerRecarga;
@@ -771,9 +772,21 @@
             </div>
           </details>
         </div>
-        ${expandida && copos.length ? `<div class="p-escolhas">${copos.map(htmlEscolha).join("")}</div>` : ""}
+        ${expandida ? `<div class="p-escolhas">${copos.map(htmlEscolha).join("")}${htmlPagamento(p)}</div>` : ""}
         ${aberta ? htmlDetalhe(p) : ""}
       </div>`;
+  }
+
+  // Aparece ao abrir a linha, ao lado do que o cliente escolheu: como vai pagar e quanto.
+  function htmlPagamento(p) {
+    const esperado = valorNaoConfere(p);
+    return `
+      <dl class="p-escolha p-pagar">
+        <div><dt>Pagamento</dt><dd>${esc(textoPagamento(p))}</dd></div>
+        ${Number(p.desconto) > 0 ? `<div><dt>Cupom</dt><dd>${esc(p.cupom || "")} · − ${dinheiro(p.desconto)}</dd></div>` : ""}
+        <div class="p-pagar-total"><dt>Total</dt><dd>${dinheiro(p.total)}</dd></div>
+        ${esperado !== null ? `<div><dt>Conferir</dt><dd class="p-alerta-texto">pelo cardápio daria ${dinheiro(esperado)}</dd></div>` : ""}
+      </dl>`;
   }
 
   // O que o cliente escolheu em cada copo: tamanho, frutas e complementos.
@@ -791,7 +804,8 @@
       </dl>`;
   }
 
-  // O que abre no botão "Montagem": os copos em camadas e os dados da entrega.
+  // O que abre no botão "Montagem": os copos em camadas e a observação.
+  // (Pagamento e valor ficam na linha aberta, em htmlPagamento.)
   function htmlDetalhe(p) {
     const copos = Array.isArray(p.copos) ? p.copos : [];
     return `
@@ -800,11 +814,6 @@
         <div class="p-detalhe-info">
           ${etiquetas(p)}
           ${p.observacoes ? `<p class="p-obs"><strong>Obs.:</strong> ${esc(p.observacoes)}</p>` : ""}
-          <dl class="p-conta">
-            <div><dt>Pagamento</dt><dd>${esc(textoPagamento(p))}</dd></div>
-            ${Number(p.desconto) > 0 ? `<div><dt>Cupom ${esc(p.cupom || "")}</dt><dd>− ${dinheiro(p.desconto)}</dd></div>` : ""}
-            <div class="p-conta-total"><dt>Total</dt><dd>${dinheiro(p.total)}</dd></div>
-          </dl>
           <p class="p-legenda">Monte de baixo (<b>1</b>) para cima (<b>5</b>). O açaí nunca vai no fundo.</p>
         </div>
       </div>`;
@@ -823,7 +832,7 @@
   /* ---------- abas ---------- */
   let abaAtual = "fila";
   function abrirAba(nome) {
-    if (!["fila", "historico", "cupons"].includes(nome)) nome = "fila";
+    if (!["fila", "historico", "cupons", "esgotados"].includes(nome)) nome = "fila";
     abaAtual = nome;
     $$("[data-aba]").forEach((b) => (b.dataset.aba === nome ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
     $$("[data-secao]").forEach((s) => (s.hidden = s.dataset.secao !== nome));
@@ -850,13 +859,15 @@
 
   /* ---------- loja aberta / fechada (botão no topo) ----------
      O site lê esta situação para mostrar "Aberto agora" ou "Fechado no momento". */
-  let loja = null; // { aberta, atualizado_em } ou null enquanto não carregou
+  let loja = null; // { aberta, atualizado_em, esgotados } ou null enquanto não carregou
   let mudandoLoja = false;
+  const pendentes = new Map(); // esgotados: id → esgotar? (enquanto o banco não confirma)
 
   async function carregarLoja() {
-    const { data, error } = await sb.from("loja").select("aberta, atualizado_em").eq("id", 1);
+    const { data, error } = await sb.from("loja").select("aberta, atualizado_em, esgotados").eq("id", 1);
     if (!error && Array.isArray(data) && data[0] && !mudandoLoja) loja = data[0];
     renderLoja();
+    renderEsgotados();
   }
 
   function renderLoja() {
@@ -879,13 +890,16 @@
   $("[data-loja]").addEventListener("click", async () => {
     if (!loja || mudandoLoja) return;
     const abrir = !loja.aberta;
+    const fora = nomesEsgotados();
     const pergunta = abrir
-      ? "ABRIR a loja?\n\nO site passa a mostrar \"Aberto agora\" para os clientes."
+      ? `ABRIR a loja?\n\nO site passa a mostrar "Aberto agora" para os clientes.${
+          fora.length ? `\n\nLembrete: continua marcado como esgotado: ${fora.join(", ")}.` : ""
+        }`
       : "FECHAR a loja?\n\nO site passa a mostrar \"Fechado no momento\". Os clientes ainda conseguem mandar pedido, avisados de que vocês respondem quando abrir.";
     if (!confirm(pergunta)) return;
     const antes = loja;
     mudandoLoja = true;
-    loja = { aberta: abrir, atualizado_em: new Date().toISOString() };
+    loja = { ...loja, aberta: abrir, atualizado_em: new Date().toISOString() };
     renderLoja();
     const { error } = await sb.from("loja").update({ aberta: abrir }).eq("id", 1);
     mudandoLoja = false;
@@ -897,6 +911,90 @@
       toast(abrir ? "Loja aberta! O site já mostra \"Aberto agora\"." : "Loja fechada. O site já mostra \"Fechado no momento\".");
     }
     carregarLoja();
+  });
+
+  /* ---------- esgotados (aba "Esgotados") ----------
+     O que for marcado aqui some do site: fica cinza, não dá para escolher, e quem
+     já tinha na sacola é avisado para tirar do copo. O site confere a cada 30 s
+     e sempre que o cliente abre a sacola. */
+  const GRUPOS_CARDAPIO = [
+    ["frutas", L.frutas || []],
+    ["acompanhamentos", L.acompanhamentos || []],
+  ];
+  const fotoItem = (i) => (i.img ? `/${String(i.img).replace(/^\/+/, "")}` : "");
+
+  function estaEsgotado(id) {
+    if (pendentes.has(id)) return pendentes.get(id);
+    return !!loja && Array.isArray(loja.esgotados) && loja.esgotados.includes(id);
+  }
+  const nomesEsgotados = () => ITENS.filter((i) => estaEsgotado(i.id)).map((i) => i.nome);
+
+  function renderEsgotados() {
+    const fora = nomesEsgotados();
+    const badge = $("[data-contagem-esgotados]");
+    badge.textContent = fora.length;
+    badge.hidden = !fora.length;
+    $("[data-repor-tudo]").hidden = !loja || !fora.length;
+    $("[data-resumo-esgotados]").innerHTML = !loja
+      ? "Carregando…"
+      : fora.length
+        ? `<strong>Fora do site agora:</strong> ${esc(fora.join(", "))}`
+        : "Tudo disponível. Toque no que acabar e o site para de oferecer na hora.";
+    for (const [grupo, itens] of GRUPOS_CARDAPIO) {
+      $(`[data-lista-esgotados="${grupo}"]`).innerHTML = itens
+        .map((i) => {
+          const esgotado = estaEsgotado(i.id);
+          return `
+            <button type="button" class="p-item" data-item="${esc(i.id)}" data-estado="${esgotado ? "esgotado" : "tem"}" aria-pressed="${esgotado}" ${!loja || pendentes.has(i.id) ? "disabled" : ""}>
+              <span class="p-item-foto" style="background-image:url('${esc(fotoItem(i))}')" aria-hidden="true"></span>
+              <span class="p-item-textos">
+                <strong>${esc(i.nome)}</strong>
+                <small>${esgotado ? "Esgotado · toque quando chegar" : "Disponível · toque se acabar"}</small>
+              </span>
+            </button>`;
+        })
+        .join("");
+    }
+  }
+
+  async function alternarEsgotado(id) {
+    if (!loja || pendentes.has(id) || !ITEM[id]) return;
+    const esgotar = !estaEsgotado(id);
+    pendentes.set(id, esgotar);
+    renderEsgotados();
+    // marca/desmarca um item de cada vez: os dois aparelhos podem mexer juntos sem um desfazer o outro
+    const { data, error } = await sb.rpc("marcar_esgotado", { p_item: id, p_esgotado: esgotar });
+    pendentes.delete(id);
+    if (error) {
+      toast("Não deu para salvar. Confira a internet e tente de novo.");
+    } else {
+      if (Array.isArray(data) && loja) loja = { ...loja, esgotados: data };
+      vibrar(15);
+      toast(esgotar ? `${nomeItem(id)}: esgotado. Saiu do site.` : `${nomeItem(id)} voltou para o site.`);
+    }
+    renderEsgotados();
+    $(`[data-item="${id}"]`)?.focus({ preventScroll: true });
+  }
+
+  async function reporTudo() {
+    const fora = nomesEsgotados();
+    if (!loja || !fora.length) return;
+    if (!confirm(`Marcar tudo como disponível de novo?\n\nVolta para o site: ${fora.join(", ")}.`)) return;
+    const { error } = await sb.from("loja").update({ esgotados: [] }).eq("id", 1);
+    if (error) toast("Não deu para salvar. Confira a internet e tente de novo.");
+    else {
+      if (loja) loja = { ...loja, esgotados: [] };
+      vibrar(15);
+      toast("Tudo de volta no site.");
+    }
+    renderEsgotados();
+    carregarLoja();
+  }
+
+  $('[data-secao="esgotados"]').addEventListener("click", (e) => {
+    const item = e.target.closest("[data-item]");
+    if (item) alternarEsgotado(item.dataset.item);
+    else if (e.target.closest("[data-repor-tudo]")) reporTudo();
   });
 
   /* ---------- som de novo pedido ---------- */

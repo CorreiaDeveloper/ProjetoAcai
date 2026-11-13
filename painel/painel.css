@@ -463,8 +463,14 @@ h2 {
   padding: 0 16px;
   border-bottom: 1px solid var(--linha);
   background: var(--acai-900);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.p-abas::-webkit-scrollbar {
+  display: none;
 }
 .p-abas button {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -489,6 +495,9 @@ h2 {
   font-size: 0.8125rem;
   font-weight: 800;
   text-align: center;
+}
+.p-contagem-alerta {
+  background: var(--vermelho);
 }
 
 /* ---------- conteúdo ---------- */
@@ -1038,27 +1047,22 @@ h2 {
   background: rgb(224 184 102 / 0.1);
   overflow-wrap: anywhere;
 }
-.p-conta {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  color: var(--ninho-2);
-  font-size: 0.9375rem;
+/* pagamento e valor (na linha aberta, ao lado das escolhas) */
+.p-escolha.p-pagar {
+  flex: 1 1 220px;
+  max-width: 380px;
+  border-color: rgb(224 184 102 / 0.4);
 }
-.p-conta div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.p-conta dd {
-  margin: 0;
-  text-align: right;
+.p-pagar dd {
   font-variant-numeric: tabular-nums;
 }
-.p-conta-total {
-  color: var(--ninho);
-  font-size: 1.0625rem;
+.p-pagar-total dd {
+  color: var(--ouro-claro);
+  font-size: 1.125rem;
   font-weight: 800;
+}
+.p-pagar .p-alerta-texto {
+  color: var(--vermelho);
 }
 
 /* ---------- entregues e cancelados ---------- */
@@ -1126,6 +1130,91 @@ h2 {
 .p-hist-info b {
   color: var(--ninho-3);
   font-weight: 700;
+}
+
+/* ---------- esgotados ---------- */
+.p-subtitulo {
+  margin: 22px 0 10px;
+  color: var(--ninho-3);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.p-itens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 10px;
+}
+.p-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 10px 14px 10px 10px;
+  border: 1.5px solid var(--linha);
+  border-radius: 16px;
+  background: var(--acai-900);
+  color: var(--ninho);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.p-item:hover {
+  border-color: rgb(255 255 255 / 0.28);
+}
+.p-item:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.p-item-foto {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: center / cover no-repeat var(--acai-700);
+  transition:
+    filter 0.2s,
+    opacity 0.2s;
+}
+.p-item-textos {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.p-item strong {
+  font-size: 1rem;
+}
+.p-item small {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--verde);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.p-item small::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.45em;
+  border-radius: 50%;
+  background: currentColor;
+}
+.p-item[data-estado="esgotado"] {
+  border-color: rgb(255 156 174 / 0.6);
+  background: rgb(255 156 174 / 0.08);
+}
+.p-item[data-estado="esgotado"] .p-item-foto {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.p-item[data-estado="esgotado"] small {
+  color: var(--vermelho);
 }
 
 /* ---------- cupons ---------- */
@@ -1334,6 +1423,15 @@ h2 {
   }
   .p-barra {
     align-items: stretch;
+  }
+  .p-abas {
+    gap: 0;
+    padding: 0 6px;
+  }
+  .p-abas button {
+    gap: 5px;
+    padding: 0 8px;
+    font-size: 0.9375rem;
   }
   .p-linha-principal {
     grid-template-columns: 1fr 1fr 36px;

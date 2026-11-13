@@ -434,6 +434,26 @@ h1 {
   border-color: var(--ouro);
   background: rgb(224 184 102 / 0.08);
 }
+/* clássico com item esgotado (marcado no painel) */
+.classico:disabled,
+.classico:disabled:hover {
+  border-color: rgb(255 255 255 / 0.08);
+  background: none;
+  color: var(--ninho-3);
+  cursor: not-allowed;
+}
+.classico:disabled .classico-fotos {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.classico:disabled::after {
+  content: "esgotado";
+  color: var(--morango);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 .classico-fotos {
   display: flex;
 }
@@ -776,6 +796,26 @@ h1 {
   color: var(--ninho-3);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
+}
+/* esgotado (marcado no painel): cinza e sem escolher */
+.ingrediente.esgotado {
+  cursor: not-allowed;
+}
+.ingrediente.esgotado .ingrediente-foto,
+.ingrediente.esgotado:hover .ingrediente-foto,
+.ingrediente.esgotado:active .ingrediente-foto {
+  filter: grayscale(1);
+  opacity: 0.4;
+  transform: none;
+}
+.ingrediente.esgotado .ingrediente-nome {
+  color: var(--ninho-3);
+}
+.ingrediente.esgotado .ingrediente-preco {
+  color: var(--morango);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* ---------- O copo (visto de cima) ---------- */
@@ -1188,6 +1228,32 @@ html.fundo-travado body {
   color: var(--ninho-2);
   font-size: 0.9375rem;
   line-height: 1.4;
+}
+.pedido-info .pedido-esgotado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 12px;
+  background: rgb(255 77 109 / 0.14);
+  color: #ffc4ce;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.pedido-esgotado button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1.5px solid var(--morango);
+  border-radius: 999px;
+  background: none;
+  color: var(--ninho);
+  font: 700 0.8125rem var(--fonte);
+  cursor: pointer;
+}
+.pedido-esgotado button:hover {
+  background: rgb(255 77 109 / 0.2);
 }
 .pedido-acoes {
   display: flex;

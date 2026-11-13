@@ -58,6 +58,8 @@
     .filter((c) => c && TAMANHO[c.tamanho] && Array.isArray(c.itens))
     .map((c) => ({ ...c, qtd: Math.max(1, c.qtd | 0), itens: c.itens.filter((id) => ITEM[id]) }));
   let modoEnviado = false;
+  let esgotados = new Set(); // ids marcados como esgotados no painel
+  const temEsgotado = (c) => c.itens.some((id) => esgotados.has(id));
 
   const precoCopo = (tamanho, itens) =>
     arred(TAMANHO[tamanho].preco + [...itens].reduce((s, id) => s + (ITEM[id]?.preco || 0), 0));
@@ -576,12 +578,18 @@
     li.dataset.id = c.id;
     const frutas = nomesDoGrupo(c.itens, "frutas");
     const acomp = nomesDoGrupo(c.itens, "acompanhamentos");
+    const fora = c.itens.filter((id) => esgotados.has(id)).map((id) => ITEM[id].nome);
     li.innerHTML = `
       <div class="pedido-copo" aria-hidden="true"></div>
       <div class="pedido-info">
         <h3>Açaí ${esc(TAMANHO[c.tamanho].nome)}</h3>
         <p>${frutas.length ? `Frutas: ${esc(frutas.join(", "))}` : "Sem frutas"}</p>
         <p>${acomp.length ? `Acompanhamentos: ${esc(acomp.join(", "))}` : "Sem acompanhamentos"}</p>
+        ${
+          fora.length
+            ? `<p class="pedido-esgotado"><span>${esc(listaNatural(fora))} ${fora.length > 1 ? "esgotaram" : "esgotou"} agora.</span><button type="button" data-tirar-esgotados>Tirar do copo</button></p>`
+            : ""
+        }
         <div class="pedido-acoes">
           <div class="qtd" role="group" aria-label="Quantidade">
             <button type="button" data-qtd="-1" aria-label="Diminuir quantidade" ${c.qtd <= 1 ? "disabled" : ""}>−</button>
@@ -608,6 +616,17 @@
       $(`[data-id="${c.id}"] [data-qtd="${botaoQtd.dataset.qtd}"]`, dialogo)?.focus();
     } else if (e.target.closest("[data-remover]")) {
       sacola = sacola.filter((x) => x !== c);
+      salvarSacola();
+    } else if (e.target.closest("[data-tirar-esgotados]")) {
+      c.itens = c.itens.filter((id) => !esgotados.has(id));
+      // se ficou igual a outro copo da sacola, junta os dois
+      const igual = sacola.find((x) => x !== c && x.tamanho === c.tamanho && x.itens.join() === c.itens.join());
+      if (igual) {
+        igual.qtd += c.qtd;
+        sacola = sacola.filter((x) => x !== c);
+      }
+      if (!sacola.some(temEsgotado)) $("[data-erro]").textContent = "";
+      vibrar(10);
       salvarSacola();
     }
   });
@@ -836,6 +855,12 @@
 
   function validar() {
     if (!sacola.length) return "Sua sacola está vazia.";
+    const comEsgotado = sacola.filter(temEsgotado);
+    if (comEsgotado.length) {
+      const fora = [...new Set(comEsgotado.flatMap((c) => c.itens.filter((id) => esgotados.has(id))))].map((id) => ITEM[id].nome);
+      $(`[data-id="${comEsgotado[0].id}"]`, dialogo)?.scrollIntoView({ behavior: rolagem(), block: "center" });
+      return `${listaNatural(fora)} ${fora.length > 1 ? "esgotaram" : "esgotou"}. Toque em "Tirar do copo" para continuar.`;
+    }
     let primeiro = null;
     for (const nome of ["nome", "predio", "apto"]) {
       const campo = form.elements[nome];
@@ -1002,13 +1027,13 @@
   async function lerStatusLoja() {
     if (!PAINEL) return null;
     try {
-      const resp = await fetch(`${PAINEL.url.replace(/\/+$/, "")}/rest/v1/loja?select=aberta&id=eq.1`, {
+      const resp = await fetch(`${PAINEL.url.replace(/\/+$/, "")}/rest/v1/loja?select=aberta,esgotados&id=eq.1`, {
         headers: { apikey: PAINEL.chave },
         cache: "no-store",
       });
       if (!resp.ok) return statusAtual; // mantém o último que se sabia
       const [linha] = await resp.json();
-      return linha ? { aberto: !!linha.aberta } : null;
+      return linha ? { aberto: !!linha.aberta, esgotados: Array.isArray(linha.esgotados) ? linha.esgotados : [] } : null;
     } catch {
       return statusAtual; // sem internet: mantém o último que se sabia
     }
@@ -1016,6 +1041,7 @@
 
   async function atualizarStatus() {
     statusAtual = await lerStatusLoja();
+    if (statusAtual) aplicarEsgotados(statusAtual.esgotados);
     const el = $("[data-status]");
     const aviso = $("[data-aviso-fechado]");
     el.hidden = !statusAtual;
@@ -1026,6 +1052,42 @@
     if (!statusAtual.aberto) {
       aviso.textContent = "Estamos fechados agora. Pode enviar o pedido mesmo assim: a gente responde assim que abrir.";
     }
+  }
+
+  /* ---------- esgotados: vocês marcam no painel ----------
+     O item fica cinza e não dá para escolher. Se estava no copo sendo montado, sai.
+     Se já estava na sacola, o copo mostra "esgotou" com o botão "Tirar do copo". */
+  function aplicarEsgotados(lista) {
+    const novo = new Set((Array.isArray(lista) ? lista : []).filter((id) => ITEM[id]));
+    if (novo.size === esgotados.size && [...novo].every((id) => esgotados.has(id))) return;
+    esgotados = novo;
+
+    $$(".ingrediente input").forEach((inp) => {
+      const fora = esgotados.has(inp.value);
+      inp.disabled = fora;
+      const label = inp.closest(".ingrediente");
+      label.classList.toggle("esgotado", fora);
+      $(".ingrediente-preco", label).textContent = fora ? "Esgotado" : `+ ${dinheiro(ITEM[inp.value].preco)}`;
+    });
+
+    $$("[data-classico]").forEach((b) => {
+      const c = CLASSICOS[+b.dataset.classico];
+      const fora = c.itens.filter((id) => esgotados.has(id)).map((id) => minuscula(ITEM[id].nome));
+      b.disabled = fora.length > 0;
+      b.title = fora.length ? `Hoje sem ${listaNatural(fora)}` : "";
+    });
+
+    const tirados = [...montagem.itens].filter((id) => esgotados.has(id));
+    if (tirados.length) {
+      tirados.forEach((id) => montagem.itens.delete(id));
+      atualizarMontagem();
+      if (!dialogo.open) {
+        const nomes = tirados.map((id) => ITEM[id].nome);
+        avisar(`${listaNatural(nomes)} ${nomes.length > 1 ? "esgotaram" : "esgotou"} e ${nomes.length > 1 ? "saíram" : "saiu"} do seu copo.`);
+      }
+    }
+
+    if (dialogo.open && !modoEnviado) renderSacola();
   }
 
   /* ---------- pedir de novo ---------- */

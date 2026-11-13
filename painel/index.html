@@ -125,6 +125,7 @@
       <button type="button" data-aba="fila" aria-current="page">Pedidos <span class="p-contagem" data-contagem-fila hidden></span></button>
       <button type="button" data-aba="historico">Histórico</button>
       <button type="button" data-aba="cupons">Cupons</button>
+      <button type="button" data-aba="esgotados">Esgotados <span class="p-contagem p-contagem-alerta" data-contagem-esgotados hidden></span></button>
     </nav>
 
     <main class="p-main">
@@ -213,6 +214,21 @@
 
         <h2 class="p-titulo-lista">Cupons</h2>
         <div class="p-cupons" data-lista-cupons></div>
+      </section>
+
+      <!-- ESGOTADOS -->
+      <section data-secao="esgotados" hidden>
+        <div class="p-barra">
+          <div>
+            <h2 class="p-titulo-secao">Esgotados</h2>
+            <p class="p-resumo" data-resumo-esgotados>Carregando…</p>
+          </div>
+          <button type="button" class="p-btn p-btn-contorno" data-repor-tudo hidden>Chegou tudo</button>
+        </div>
+        <h3 class="p-subtitulo">Frutas</h3>
+        <div class="p-itens" data-lista-esgotados="frutas"></div>
+        <h3 class="p-subtitulo">Complementos</h3>
+        <div class="p-itens" data-lista-esgotados="acompanhamentos"></div>
       </section>
 
       <footer class="p-rodape-seg">

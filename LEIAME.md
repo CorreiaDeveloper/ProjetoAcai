@@ -36,15 +36,16 @@ Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `
 - **Aplicativo:** pelo menu do navegador, "Adicionar à tela inicial" cria o ícone da Ganath no celular (arquivo `manifest.webmanifest`).
 - **Código do pedido:** cada pedido ganha um código curto (ex.: `#K7QA`) que aparece no WhatsApp e no painel.
 - **Cupom de desconto:** o cliente digita o cupom na sacola, e o site confere no banco antes de dar o desconto.
+- **Esgotados:** o que vocês marcam como esgotado no painel fica cinza no site, com "Esgotado" no lugar do preço, e não dá para escolher. Os clássicos que levam esse item ficam desligados. Se o item estava no copo que a pessoa montava, ele sai, e ela é avisada. Se já estava na sacola, o copo mostra "Morango esgotou agora" com o botão "Tirar do copo", e o pedido só vai depois disso.
 
 ## Painel de pedidos
 
 Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, com um único login para vocês dois).
 
 - **Loja ABERTA / FECHADA:** é o botão no topo. Toque, confirme, e o site muda na hora. Se o outro aparelho estiver com o painel aberto, ele também atualiza sozinho. O site não mostra desde quando a loja está fechada, só se está aberta ou não.
-- **Pedidos:** chegam na hora, com som, numa lista em linhas por ordem de chegada (nº do pedido, horário, nome, torre e apto). Ao clicar na linha, ela mostra o que o cliente escolheu: tamanho, frutas e complementos. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
+- **Pedidos:** chegam na hora, com som, numa lista em linhas por ordem de chegada (nº do pedido, horário, nome, torre e apto). Ao clicar na linha, ela mostra o que o cliente escolheu (tamanho, frutas e complementos), a forma de pagamento (com o troco) e o total. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
 - **Histórico:** os pedidos das últimas 2 semanas, um por linha (código, dia e horário, nome, apto e valor), com o total do período. Ao clicar, mostra os detalhes do pedido. É só para consulta.
-- **Montagem do copo:** o botão "Montagem" mostra as 5 camadas, de baixo para cima: recheio, açaí, recheio, açaí, recheio. O açaí nunca vai no fundo.
+- **Montagem do copo:** o botão "Montagem" mostra as 5 camadas, de baixo para cima: recheio, açaí, recheio, açaí, recheio, e a observação do cliente. O açaí nunca vai no fundo.
   - **Fundo:** caldas + pós.
   - **Meio:** frutas + caldas.
   - **Topo:** pós + balas, confete e crocantes.
@@ -54,6 +55,9 @@ Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, co
   - O banco confere pela torre e pelo apartamento, entendendo "Torre 2 / Apto 34" e "2 / 034" como o mesmo lugar. O celular também lembra.
   - Pedido cancelado devolve o cupom para aquele apartamento.
   - Desmarque a caixinha para o cupom poder ser repetido.
+- **Esgotados:** a aba mostra todas as frutas e complementos. Toque no que acabou: fica vermelho, "Esgotado", e some do site em até 30 segundos (na hora para quem abre a sacola). Toque de novo quando chegar. "Chegou tudo" volta tudo de uma vez.
+  - O número vermelho na aba lembra quantos itens estão fora.
+  - Ao abrir a loja, o painel lembra o que ainda está marcado como esgotado.
 - **No celular:** "Adicionar à tela inicial" cria o ícone "Painel". O botão "Manter tela acesa" evita que a tela apague na bancada.
 
 Os pedidos ficam no **Supabase** (plano grátis). O WhatsApp continua sendo o caminho principal: se o banco cair, o pedido chega pelo WhatsApp do mesmo jeito.
