@@ -33,6 +33,15 @@ window.LOJA = {
   // Exemplo: ["Pix", "Dinheiro"]
   formasPagamento: ["Pix", "Dinheiro", "Cartão"],
 
+  // Painel de pedidos (Supabase). Cada pedido enviado também aparece no painel
+  // e o cliente pode usar cupom de desconto. A chave abaixo é PÚBLICA, feita para
+  // ficar no site (quem protege os pedidos são as regras do banco).
+  // Para desligar o painel e os cupons, apague este bloco.
+  painel: {
+    url: "https://gxjqlgkaunbjfgtqeted.supabase.co",
+    chave: "sb_publishable_DssThRHkq6uY50thrUpN1g_xXBjmwwt",
+  },
+
   tamanhos: [
     { id: "300", nome: "300 ml", preco: 14.9 },
     { id: "500", nome: "500 ml", preco: 19.9 },

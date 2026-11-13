@@ -33,6 +33,7 @@
   const GIRO_CALDA = [24, -30, 72];
   const PAGAMENTOS = Array.isArray(L.formasPagamento) ? L.formasPagamento : [];
   const TAXA = Number(L.taxaEntrega) || 0;
+  const PAINEL = L.painel && L.painel.url && L.painel.chave ? L.painel : null;
 
   /* ---------- armazenamento local (pode falhar em aba anônima) ---------- */
   const ler = (chave, padrao) => {
@@ -586,7 +587,8 @@
 
   function calcularTotais() {
     const subtotal = arred(sacola.reduce((s, c) => s + precoCopo(c.tamanho, c.itens) * c.qtd, 0));
-    return { subtotal, entrega: TAXA, total: arred(subtotal + TAXA) };
+    const desconto = descontoDoCupom(subtotal);
+    return { subtotal, entrega: TAXA, desconto, total: arred(subtotal + TAXA - desconto) };
   }
 
   function renderSacola() {
@@ -601,12 +603,121 @@
 
   function atualizarTotais() {
     const t = calcularTotais();
-    $("[data-linha-subtotal]").hidden = !TAXA;
+    $("[data-linha-subtotal]").hidden = !TAXA && !t.desconto;
     $("[data-linha-entrega]").hidden = !TAXA;
+    $("[data-linha-desconto]").hidden = !t.desconto;
     $("[data-subtotal]").textContent = dinheiro(t.subtotal);
     $("[data-entrega]").textContent = dinheiro(t.entrega);
+    $("[data-desconto-rotulo]").textContent = cupom ? `Cupom ${cupom.codigo}` : "Desconto";
+    $("[data-desconto]").textContent = `− ${dinheiro(t.desconto)}`;
     $("[data-total-pedido]").textContent = dinheiro(t.total);
+    if (cupom) {
+      const falta = cupom.pedido_minimo ? arred(cupom.pedido_minimo - t.subtotal) : 0;
+      if (falta > 0) {
+        mostrarCupom(`Esse cupom vale para pedidos a partir de ${dinheiro(cupom.pedido_minimo)}. Faltam ${dinheiro(falta)}.`, "aviso");
+      } else mostrarCupom(`Cupom aplicado: ${descreverCupom(cupom)}.`, "ok");
+    }
   }
+
+  /* ---------- cupom de desconto (conferido no painel) ---------- */
+  let cupom = null; // { codigo, tipo: "percentual" | "valor", valor, pedido_minimo }
+  const campoCupom = form.elements.cupom;
+  const botaoCupom = $("[data-aplicar-cupom]");
+  $("[data-bloco-cupom]").hidden = !PAINEL;
+
+  function descontoDoCupom(subtotal) {
+    if (!cupom || (cupom.pedido_minimo && subtotal < cupom.pedido_minimo)) return 0;
+    const v = cupom.tipo === "percentual" ? (subtotal * cupom.valor) / 100 : cupom.valor;
+    return arred(Math.min(v, subtotal));
+  }
+
+  function descreverCupom(c) {
+    const numero = (v) => String(v).replace(".", ",");
+    return c.tipo === "percentual" ? `${numero(c.valor)}% de desconto` : `${dinheiro(c.valor)} de desconto`;
+  }
+
+  function mostrarCupom(texto, tipo = "") {
+    const el = $("[data-cupom-status]");
+    el.textContent = texto;
+    el.dataset.tipo = tipo;
+  }
+
+  function atualizarBotaoCupom() {
+    botaoCupom.textContent = cupom ? "Remover" : "Aplicar";
+    botaoCupom.classList.toggle("aplicado", !!cupom);
+    campoCupom.readOnly = !!cupom;
+  }
+
+  function limparCupom() {
+    cupom = null;
+    campoCupom.value = "";
+    campoCupom.removeAttribute("aria-invalid");
+    mostrarCupom("");
+    atualizarBotaoCupom();
+  }
+
+  function chamarPainel(caminho, corpo, { headers = {}, keepalive = false } = {}) {
+    return fetch(`${PAINEL.url.replace(/\/+$/, "")}/rest/v1/${caminho}`, {
+      method: "POST",
+      headers: { apikey: PAINEL.chave, "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(corpo),
+      keepalive,
+    });
+  }
+
+  async function aplicarCupom() {
+    const codigo = campoCupom.value.replace(/\s+/g, "").toUpperCase();
+    if (!codigo) {
+      mostrarCupom("Digite o código do cupom.", "erro");
+      campoCupom.focus();
+      return;
+    }
+    botaoCupom.disabled = true;
+    mostrarCupom("Conferindo o cupom…");
+    try {
+      const resp = await chamarPainel("rpc/validar_cupom", { p_codigo: codigo });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const c = await resp.json();
+      if (c && c.codigo) {
+        cupom = {
+          codigo: c.codigo,
+          tipo: c.tipo,
+          valor: Number(c.valor),
+          pedido_minimo: c.pedido_minimo == null ? null : Number(c.pedido_minimo),
+        };
+        campoCupom.value = cupom.codigo;
+        campoCupom.removeAttribute("aria-invalid");
+        if (/cupom/i.test($("[data-erro]").textContent)) $("[data-erro]").textContent = "";
+        vibrar(12);
+      } else {
+        campoCupom.setAttribute("aria-invalid", "true");
+        mostrarCupom("Cupom não encontrado ou fora da validade.", "erro");
+      }
+    } catch {
+      mostrarCupom("Não deu para conferir o cupom agora. Tente de novo em instantes.", "erro");
+    } finally {
+      botaoCupom.disabled = false;
+      atualizarBotaoCupom();
+      atualizarTotais();
+    }
+  }
+
+  botaoCupom.addEventListener("click", () => {
+    if (cupom) {
+      limparCupom();
+      atualizarTotais();
+      campoCupom.focus();
+    } else aplicarCupom();
+  });
+  campoCupom.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (!cupom) aplicarCupom();
+  });
+  campoCupom.addEventListener("input", () => {
+    if (!cupom) mostrarCupom("");
+    if (!campoCupom.value.trim() && /cupom/i.test($("[data-erro]").textContent)) $("[data-erro]").textContent = "";
+  });
 
   /* ---------- formulário ---------- */
 
@@ -651,7 +762,7 @@
   });
   form.addEventListener("change", atualizarFormulario);
 
-  const ROTULOS = { nome: "seu nome", predio: "o prédio", apto: "o apartamento" };
+  const ROTULOS = { nome: "seu nome", predio: "a torre", apto: "o apartamento" };
 
   function lerTroco() {
     const bruto = form.elements.troco.value.trim();
@@ -686,13 +797,60 @@
         return `O troco precisa ser maior que o total de ${dinheiro(total)}.`;
       }
     }
+    if (PAINEL && !cupom && campoCupom.value.trim()) {
+      campoCupom.focus();
+      return "Toque em Aplicar para usar o cupom (ou apague o código).";
+    }
     return "";
   }
 
-  function montarMensagem() {
+  // Código curto do pedido: aparece no WhatsApp e no painel, para achar um no outro.
+  const LETRAS_CODIGO = "ACDEFHJKMNPRTUVWXY34679";
+  function novoCodigo() {
+    const n = new Uint32Array(4);
+    try {
+      crypto.getRandomValues(n);
+    } catch {
+      n.forEach((_, i) => (n[i] = Math.floor(Math.random() * 1e9)));
+    }
+    return Array.from(n, (x) => LETRAS_CODIGO[x % LETRAS_CODIGO.length]).join("");
+  }
+
+  // Também manda o pedido para o painel. Se falhar, tudo bem: o WhatsApp é o caminho principal.
+  function enviarAoPainel(codigo, t) {
+    if (!PAINEL) return;
+    const f = form.elements;
+    const pagamento = pagamentoEscolhido();
+    const troco = pagamento === "Dinheiro" ? lerTroco() : null;
+    const dados = {
+      codigo,
+      nome: f.nome.value.trim().slice(0, 60),
+      predio: f.predio.value.trim().slice(0, 20),
+      apartamento: f.apto.value.trim().slice(0, 20),
+      pagamento: pagamento ? pagamento.slice(0, 30) : null,
+      troco: troco > 0 && troco < 10000 ? arred(troco) : null,
+      observacoes: f.obs.value.trim().slice(0, 500) || null,
+      copos: sacola.slice(0, 30).map((c) => ({ tamanho: c.tamanho, itens: c.itens, qtd: c.qtd, preco: precoCopo(c.tamanho, c.itens) })),
+      subtotal: t.subtotal,
+      cupom: cupom ? cupom.codigo : null,
+      desconto: t.desconto,
+      total: t.total,
+      loja_fechada: !!(statusAtual && !statusAtual.aberto),
+    };
+    const enviar = (keepalive) => chamarPainel("pedidos", dados, { keepalive, headers: { Prefer: "return=minimal" } });
+    try {
+      enviar(true)
+        .catch(() => enviar(false))
+        .catch(() => {});
+    } catch {
+      /* sem rede: segue só pelo WhatsApp */
+    }
+  }
+
+  function montarMensagem(codigo) {
     const f = form.elements;
     const t = calcularTotais();
-    const linhas = [`*Pedido - ${L.nome}*`];
+    const linhas = [`*Pedido ${codigo} - ${L.nome}*`];
     if (statusAtual && !statusAtual.aberto) linhas.push("_(enviado com a loja fechada)_");
     linhas.push("");
 
@@ -705,14 +863,13 @@
       linhas.push("");
     }
 
-    if (TAXA) {
-      linhas.push(`Subtotal: ${dinheiro(t.subtotal)}`);
-      linhas.push(`Entrega: ${dinheiro(t.entrega)}`);
-    }
+    if (TAXA || t.desconto) linhas.push(`Subtotal: ${dinheiro(t.subtotal)}`);
+    if (TAXA) linhas.push(`Entrega: ${dinheiro(t.entrega)}`);
+    if (t.desconto) linhas.push(`Cupom ${cupom.codigo}: -${dinheiro(t.desconto)}`);
     linhas.push(`*Total: ${dinheiro(t.total)}*`, "");
 
     linhas.push(`*Nome:* ${f.nome.value.trim()}`);
-    linhas.push(`*Prédio:* ${f.predio.value.trim()}`);
+    linhas.push(`*Torre:* ${f.predio.value.trim()}`);
     linhas.push(`*Apartamento:* ${f.apto.value.trim()}`);
 
     const pagamento = pagamentoEscolhido();
@@ -731,8 +888,10 @@
     $("[data-erro]").textContent = erro;
     if (erro) return;
 
-    const url = `https://wa.me/${String(L.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(montarMensagem())}`;
+    const codigo = novoCodigo();
+    const url = `https://wa.me/${String(L.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(montarMensagem(codigo))}`;
     $("[data-link-pedido]").href = url;
+    enviarAoPainel(codigo, calcularTotais());
     guardar("ganath:ultimo", {
       data: Date.now(),
       copos: sacola.map(({ tamanho, itens, qtd }) => ({ tamanho, itens, qtd })),
@@ -748,6 +907,7 @@
     // o "Pedir de novo" (ou o link "toque aqui") recupera tudo.
     sacola = [];
     guardar("ganath:sacola", sacola);
+    limparCupom();
     atualizarContador();
     modoEnviado = true;
     renderSacola();

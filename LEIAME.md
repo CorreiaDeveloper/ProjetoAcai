@@ -1,6 +1,6 @@
 # Ganath Açaí: site de pedidos do condomínio
 
-O morador monta o copo, coloca na sacola, informa nome, prédio e apartamento, e o pedido chega pronto no WhatsApp da loja.
+O morador monta o copo, coloca na sacola, informa nome, torre e apartamento, e o pedido chega pronto no WhatsApp da loja.
 
 ## Como ver o site
 
@@ -30,10 +30,32 @@ Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `
 ## Recursos do site
 
 - **Aberto / fechado automático:** usa o horário de São Paulo. Pedido feito com a loja fechada pode ser enviado, mas chega marcado no WhatsApp.
-- **Sacola esvazia ao enviar:** quando a pessoa toca em "Enviar pedido pelo WhatsApp", a sacola fica vazia. Nome, prédio e apartamento continuam lembrados para o próximo pedido.
+- **Sacola esvazia ao enviar:** quando a pessoa toca em "Enviar pedido pelo WhatsApp", a sacola fica vazia. Nome, Torre e apartamento continuam lembrados para o próximo pedido.
 - **Pedir de novo:** o celular de cada morador lembra o último pedido, que pode ser repetido com um toque.
 - **Festa de frutas:** quando a pessoa volta do WhatsApp depois de enviar, as frutas do pedido "explodem" na tela.
 - **Aplicativo:** pelo menu do navegador, "Adicionar à tela inicial" cria o ícone da Ganath no celular (arquivo `manifest.webmanifest`).
+- **Código do pedido:** cada pedido ganha um código curto (ex.: `#K7QA`) que aparece no WhatsApp e no painel.
+- **Cupom de desconto:** o cliente digita o cupom na sacola, e o site confere no banco antes de dar o desconto.
+
+## Painel de pedidos
+
+Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, com um único login para vocês dois).
+
+- **Pedidos:** chegam na hora, com som, numa lista em linhas (nº do pedido, horário, nome, torre e apto). Embaixo de cada um aparece o que o cliente escolheu: tamanho, frutas e complementos. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. Dá para ver em ordem de chegada ou agrupado por torre. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
+- **Montagem do copo:** o botão "Montagem" mostra as 5 camadas, de baixo para cima: recheio, açaí, recheio, açaí, recheio. O açaí nunca vai no fundo.
+  - **Fundo:** caldas + pós.
+  - **Meio:** frutas + caldas.
+  - **Topo:** pós + balas, confete e crocantes.
+  - Em quais camadas cada item vai está no começo de `painel/painel.js` (`CAMADAS_DO_ITEM`).
+- **Cupons:** criar, ligar/desligar, apagar e copiar o convite para mandar no WhatsApp. Pode ter porcentagem ou valor em reais, pedido mínimo, data final e limite de usos.
+- **No celular:** "Adicionar à tela inicial" cria o ícone "Painel". O botão "Manter tela acesa" evita que a tela apague na bancada.
+
+Os pedidos ficam no **Supabase** (plano grátis). O WhatsApp continua sendo o caminho principal: se o banco cair, o pedido chega pelo WhatsApp do mesmo jeito.
+
+- **Conexão:** a chave que fica no `js/config.js` (bloco `painel`) é pública. Quem protege os dados são as regras do banco:
+  - o site só consegue **adicionar** pedidos e **conferir** um cupom;
+  - ver, mudar e apagar exige o login da equipe.
+- **Atenção:** o projeto grátis do Supabase pausa se ficar uma semana sem uso. Se isso acontecer, entre em supabase.com e clique em "Restore".
 
 ## Logo
 
@@ -66,6 +88,7 @@ index.html        página
 css/style.css     visual
 js/config.js      preços, número, endereço  ← o que você edita
 js/app.js         funcionamento (copo, abas, sacola, mensagem do WhatsApp)
+painel/           painel de pedidos e cupons (com login)
 img/              fotos (geradas no ComfyUI com FLUX.2 Klein)
 logo/             logo em PNG e página de visualização
 ```

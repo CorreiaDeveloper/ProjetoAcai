@@ -181,7 +181,7 @@
 
           <div class="campos-lado">
             <label class="campo">
-              <span>Prédio</span>
+              <span>Torre</span>
               <input name="predio" required placeholder="Ex.: 2">
             </label>
             <label class="campo">
@@ -205,6 +205,15 @@
             <textarea name="obs" rows="2" placeholder="Ex.: açaí bem batido, sem colher"></textarea>
           </label>
 
+          <div class="campo campo-cupom" data-bloco-cupom hidden>
+            <label for="cupom">Cupom de desconto <em>(opcional)</em></label>
+            <div class="cupom-linha">
+              <input id="cupom" name="cupom" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" enterkeyhint="done" placeholder="Ex.: BEMVINDO">
+              <button type="button" class="btn-cupom" data-aplicar-cupom>Aplicar</button>
+            </div>
+            <p class="cupom-status" data-cupom-status role="status"></p>
+          </div>
+
           <p class="aviso-fechado" data-aviso-fechado hidden></p>
           <p class="checkout-erro" data-erro role="alert"></p>
         </form>
@@ -222,6 +231,7 @@
       <dl class="totais">
         <div data-linha-subtotal><dt>Subtotal</dt><dd data-subtotal></dd></div>
         <div data-linha-entrega><dt>Entrega</dt><dd data-entrega></dd></div>
+        <div class="totais-desconto" data-linha-desconto hidden><dt data-desconto-rotulo>Desconto</dt><dd data-desconto></dd></div>
         <div class="totais-final"><dt>Total</dt><dd data-total-pedido></dd></div>
       </dl>
       <button class="btn btn-whats" type="submit" form="checkout" data-enviar>

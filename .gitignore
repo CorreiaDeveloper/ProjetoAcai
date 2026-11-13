@@ -8,3 +8,6 @@ desktop.ini
 
 # página de gestão: SÓ LOCAL (nunca vai para o GitHub nem para a Vercel)
 gestao/
+
+# conexão do Claude com o Supabase: SÓ LOCAL
+.mcp.json

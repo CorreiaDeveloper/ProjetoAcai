@@ -1333,6 +1333,80 @@ h2 {
   outline-offset: 2px;
 }
 
+/* cupom de desconto */
+.campo-cupom > label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.cupom-linha {
+  display: flex;
+  gap: 8px;
+}
+.cupom-linha input {
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cupom-linha input::placeholder {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.cupom-linha input:read-only {
+  border-color: rgb(142 230 168 / 0.55);
+  color: #b9f5cb;
+}
+.btn-cupom {
+  flex: none;
+  min-height: 50px;
+  padding: 0 18px;
+  border: 1.5px solid var(--ouro);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ouro-claro);
+  font: 700 0.9375rem var(--fonte);
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+.btn-cupom:hover {
+  background: rgb(224 184 102 / 0.12);
+}
+.btn-cupom:focus-visible {
+  outline: 3px solid var(--ouro);
+  outline-offset: 2px;
+}
+.btn-cupom:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.btn-cupom.aplicado {
+  border-color: rgb(255 255 255 / 0.16);
+  color: var(--ninho-2);
+}
+.cupom-status {
+  margin: 0;
+  color: var(--ninho-2);
+  font-size: 0.9375rem;
+}
+.cupom-status:empty {
+  display: none;
+}
+.cupom-status[data-tipo="ok"] {
+  color: #8ee6a8;
+  font-weight: 600;
+}
+.cupom-status[data-tipo="erro"] {
+  color: #ff9cae;
+  font-weight: 600;
+}
+.cupom-status[data-tipo="aviso"] {
+  color: var(--ouro-claro);
+}
+.totais .totais-desconto {
+  color: #8ee6a8;
+}
+
 .checkout-erro {
   margin: 0;
   color: #ff9cae;
