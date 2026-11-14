@@ -664,23 +664,35 @@
 
   // O total vem do celular do cliente. Recalcula pelo cardápio atual (js/config.js)
   // para pegar valor adulterado. Devolve null quando não dá para conferir (item que saiu do cardápio).
-  function totalPeloCardapio(p) {
+  // "antigos": preços de um cardápio anterior (só os que mudaram), ex.: { "500": 19.9, nutella: 4.5 }.
+  function totalPeloCardapio(p, antigos = {}) {
+    const valor = (id, atual) => Number(antigos[id] ?? atual) || 0;
     let subtotal = 0;
     for (const c of Array.isArray(p.copos) ? p.copos : []) {
       const tamanho = TAMANHO[c?.tamanho];
       if (!tamanho) return null;
-      let preco = Number(tamanho.preco) || 0;
+      let preco = valor(tamanho.id, tamanho.preco);
       for (const id of new Set(Array.isArray(c?.itens) ? c.itens : [])) {
         if (!ITEM[id]) return null;
-        preco += Number(ITEM[id].preco) || 0;
+        preco += valor(id, ITEM[id].preco);
       }
       subtotal += preco * Math.max(1, Number(c?.qtd) || 1);
     }
     return Math.round((subtotal + (Number(L.taxaEntrega) || 0) - (Number(p.desconto) || 0)) * 100) / 100;
   }
+
+  // Cardápios que já valeram (só os preços que mudaram depois). Um pedido feito com
+  // o preço antigo não é marcado como "Conferir valor".
+  // Ao mudar um preço no js/config.js, acrescente aqui uma linha com o preço que saiu.
+  const PRECOS_ANTERIORES = [
+    { "300": 14.9, "500": 19.9, nutella: 4.5, "leite-condensado": 2.0 }, // até 14/11/2026
+  ];
   function valorNaoConfere(p) {
     const esperado = totalPeloCardapio(p);
-    return esperado !== null && Math.abs(esperado - Number(p.total)) > 0.05 ? esperado : null;
+    if (esperado === null) return null;
+    const bate = (v) => v !== null && Math.abs(v - Number(p.total)) <= 0.05;
+    if (bate(esperado) || PRECOS_ANTERIORES.some((antigos) => bate(totalPeloCardapio(p, antigos)))) return null;
+    return esperado;
   }
   function sinalValor(p, classe) {
     const esperado = valorNaoConfere(p);

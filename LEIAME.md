@@ -23,6 +23,8 @@ Dê dois cliques em `index.html`. Ele abre no navegador e funciona sem instalar 
 
 Os preços usam ponto, não vírgula: `14.90`.
 
+Ao mudar um preço, o painel passa a conferir os pedidos pelo preço novo. Para os pedidos antigos não aparecerem com "Conferir valor", anote o preço que saiu na lista `PRECOS_ANTERIORES`, no começo da parte "Conferir valor" de `painel/painel.js`.
+
 Se `formasPagamento` tiver `"Dinheiro"`, o site também pergunta "troco para quanto?".
 
 Para incluir uma fruta nova, copie uma linha de `frutas`, troque `id`, `nome`, `preco` e coloque uma foto quadrada em `img/`. O ideal é a foto da fruta ocupando a imagem inteira, vista de cima.

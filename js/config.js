@@ -39,8 +39,8 @@ window.LOJA = {
   },
 
   tamanhos: [
-    { id: "300", nome: "300 ml", preco: 14.9 },
-    { id: "500", nome: "500 ml", preco: 19.9 },
+    { id: "300", nome: "300 ml", preco: 15.9 },
+    { id: "500", nome: "550 ml", preco: 21.9 }, // o id continua "500" (é o que os pedidos antigos guardam)
   ],
 
   frutas: [
@@ -52,8 +52,8 @@ window.LOJA = {
 
   // "calda" é a foto da calda que escorre por cima do copo (em vez de virar uma fatia).
   acompanhamentos: [
-    { id: "nutella", nome: "Nutella", preco: 4.5, img: "img/nutella.webp", calda: "img/calda-nutella.webp" },
-    { id: "leite-condensado", nome: "Leite condensado", preco: 2.0, img: "img/leite-condensado.webp", calda: "img/calda-leite.webp" },
+    { id: "nutella", nome: "Nutella", preco: 6.0, img: "img/nutella.webp", calda: "img/calda-nutella.webp" },
+    { id: "leite-condensado", nome: "Leite condensado", preco: 2.5, img: "img/leite-condensado.webp", calda: "img/calda-leite.webp" },
     { id: "pacoca", nome: "Paçoca", preco: 2.0, img: "img/pacoca.webp" },
     { id: "sucrilhos", nome: "Sucrilhos", preco: 2.0, img: "img/sucrilhos.webp" },
     { id: "leite-ninho", nome: "Leite Ninho", preco: 3.0, img: "img/leite-ninho.webp" },
