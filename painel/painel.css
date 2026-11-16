@@ -575,6 +575,10 @@ h2 {
   gap: 20px;
   max-width: 1240px;
 }
+/* Histórico: o botão "Baixar planilha completa" fica alinhado com o fim da lista */
+[data-secao="historico"] > .p-barra {
+  max-width: 1240px;
+}
 .p-grupo-status {
   --cor: var(--ouro);
   display: grid;

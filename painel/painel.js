@@ -1197,6 +1197,105 @@
     $(`[data-hist="${id}"] [data-expandir-hist]`)?.focus({ preventScroll: true });
   });
 
+  /* ---------- planilha: TODOS os pedidos, desde o primeiro, num arquivo que abre no Excel ---------- */
+  const fmtDataBR = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
+
+  async function buscarTodosPedidos() {
+    const lote = 1000; // o banco entrega no máximo 1000 por vez
+    const todos = [];
+    for (let de = 0; ; de += lote) {
+      const { data, error } = await sb.from("pedidos").select("*").order("id", { ascending: true }).range(de, de + lote - 1);
+      if (error) throw error;
+      todos.push(...data);
+      if (data.length < lote) return todos;
+    }
+  }
+
+  // Texto numa célula. O que o cliente digitou e começa com = + - @ vai como texto,
+  // senão o Excel poderia tratar como fórmula.
+  function celula(v) {
+    let t = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+    return /[";\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  }
+  // Valor com vírgula e sem "R$", para o Excel somar.
+  const valorPlanilha = (v) => (v === null || v === undefined || v === "" ? "" : (Number(v) || 0).toFixed(2).replace(".", ","));
+
+  const coposDe = (p) => (Array.isArray(p.copos) ? p.copos : []);
+  const contarCopos = (p, tamanho) =>
+    coposDe(p).reduce((s, c) => s + (tamanho && c?.tamanho !== tamanho ? 0 : Math.max(1, Number(c?.qtd) || 1)), 0);
+  const textoCopos = (p) =>
+    coposDe(p)
+      .map((c) => {
+        const itens = (Array.isArray(c?.itens) ? c.itens : []).map(String).sort(porOrdemDoCardapio).map(nomeItem);
+        return `${Math.max(1, Number(c?.qtd) || 1)}× ${nomeTamanho(c?.tamanho)}: ${itens.length ? itens.join(", ") : "só açaí"}`;
+      })
+      .join(" | ");
+
+  function linhasPlanilha(pedidos) {
+    const tamanhos = L.tamanhos || [];
+    const cabecalho = ["Código", "Data", "Hora", "Situação", "Nome", "Torre", "Apto", "Copos", ...tamanhos.map((t) => `Copos ${t.nome}`),
+      "Pedido", "Subtotal", "Cupom", "Desconto", "Total", "Pagamento", "Troco para", "Observação", "Loja fechada", "Conferir"];
+    const linha = (p) => {
+      const esperado = valorNaoConfere(p);
+      const conferir = [esperado !== null ? `valor: pelo cardápio daria ${valorPlanilha(esperado)}` : "", p.cupom_ok === false ? "cupom" : ""];
+      return [
+        celula(p.codigo || p.id),
+        fmtDataBR.format(new Date(p.criado_em)),
+        horaSP(p.criado_em),
+        celula(NOME_STATUS[p.status] || p.status),
+        celula(p.nome),
+        celula(p.predio),
+        celula(p.apartamento),
+        contarCopos(p),
+        ...tamanhos.map((t) => contarCopos(p, t.id)),
+        celula(textoCopos(p)),
+        valorPlanilha(p.subtotal),
+        celula(p.cupom),
+        valorPlanilha(p.desconto ?? 0),
+        valorPlanilha(p.total),
+        celula(p.pagamento || "Combinar no WhatsApp"),
+        valorPlanilha(p.troco),
+        celula(p.observacoes),
+        p.loja_fechada ? "Sim" : "Não",
+        celula(conferir.filter(Boolean).join(", ")),
+      ].join(";");
+    };
+    return [cabecalho.map(celula).join(";"), ...pedidos.map(linha)];
+  }
+
+  async function baixarPlanilha() {
+    const botao = $("[data-baixar-planilha]");
+    if (botao.disabled) return;
+    const rotulo = botao.textContent;
+    botao.disabled = true;
+    botao.textContent = "Preparando…";
+    try {
+      const pedidos = await buscarTodosPedidos();
+      if (!pedidos.length) {
+        toast("Ainda não tem nenhum pedido para baixar.");
+        return;
+      }
+      // ﻿ no começo: faz o Excel abrir com os acentos certos.
+      const arquivo = new Blob(["﻿" + linhasPlanilha(pedidos).join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(arquivo);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ganath-pedidos-${dataSP(new Date())}.csv`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast(`Planilha baixada: ${pedidos.length} ${pedidos.length === 1 ? "pedido" : "pedidos"}, do primeiro até hoje.`);
+    } catch {
+      toast("Não deu para baixar a planilha. Confira a internet e tente de novo.");
+    } finally {
+      botao.disabled = false;
+      botao.textContent = rotulo;
+    }
+  }
+  $("[data-baixar-planilha]").addEventListener("click", baixarPlanilha);
+
   /* ============================================================
      CUPONS
      ============================================================ */
