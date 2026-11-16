@@ -1135,6 +1135,21 @@ h2 {
   color: var(--ninho-3);
   font-weight: 700;
 }
+.p-hist-info .p-link-mini {
+  min-height: 32px;
+  padding: 0 6px;
+  font-size: 0.875rem;
+}
+.p-mudar-pag {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.p-mudar-pag [aria-pressed="true"] {
+  border-color: var(--ouro);
+  color: var(--ouro-claro);
+}
 
 /* ---------- esgotados ---------- */
 .p-subtitulo {

@@ -1177,7 +1177,7 @@
     const info = [
       `<span><b>Situação:</b> ${esc(NOME_STATUS[p.status] || p.status)}${ATIVOS.includes(p.status) ? "" : ` às ${horaSP(p.atualizado_em)}`}</span>`,
       sinalValor(p, "p-sinal"),
-      `<span><b>Pagamento:</b> ${esc(textoPagamento(p))}</span>`,
+      htmlPagamentoHist(p),
       taxaDe(p) > 0 ? `<span><b>Taxa da maquininha:</b> − ${dinheiro(taxaDe(p))} (sobra ${dinheiro(Number(p.total) - taxaDe(p))})</span>` : "",
       Number(p.desconto) > 0 ? `<span><b>Cupom ${esc(p.cupom || "")}:</b> − ${dinheiro(p.desconto)}</span>` : "",
       p.observacoes ? `<span><b>Obs.:</b> ${esc(p.observacoes)}</span>` : "",
@@ -1194,10 +1194,66 @@
       </div>`;
   }
 
+  /* ---------- corrigir a forma de pagamento (ex.: escolheu Cartão e pagou no Pix) ---------- */
+  let mudandoPagamento = null; // id do pedido com as opções abertas
+
+  function htmlPagamentoHist(p) {
+    if (mudandoPagamento !== p.id) {
+      return `<span><b>Pagamento:</b> ${esc(textoPagamento(p))} <button type="button" class="p-link p-link-mini" data-mudar-pagamento>Mudar</button></span>`;
+    }
+    const opcoes = [...new Set([...(L.formasPagamento || []), p.pagamento].filter(Boolean))];
+    return `
+      <span class="p-mudar-pag" role="group" aria-label="Como o pedido #${esc(p.codigo || p.id)} foi pago">
+        <b>Pagou com:</b>
+        ${opcoes.map((f) => `<button type="button" class="p-mini" data-pagou="${esc(f)}" aria-pressed="${f === p.pagamento}">${esc(f)}</button>`).join("")}
+        <button type="button" class="p-link p-link-mini" data-pagou-cancelar>Cancelar</button>
+      </span>`;
+  }
+
+  async function mudarPagamento(id, forma) {
+    const p = historico.find((x) => x.id === id);
+    mudandoPagamento = null;
+    if (!p || forma === p.pagamento) return renderHistorico();
+    // troco só faz sentido no dinheiro que o cliente avisou; ao corrigir, ele sai
+    const dados = { pagamento: forma, troco: null };
+    const antes = { pagamento: p.pagamento, troco: p.troco };
+    Object.assign(p, dados);
+    renderHistorico();
+    const { error } = await sb.from("pedidos").update(dados).eq("id", id);
+    if (error) {
+      Object.assign(p, antes);
+      renderHistorico();
+      toast("Não deu para mudar o pagamento. Confira a internet e tente de novo.");
+      return;
+    }
+    toast(`#${p.codigo || p.id}: pagamento mudou para ${forma}.`);
+    agendarRecarga(); // atualiza a lista de pedidos (e o outro aparelho recebe pelo tempo real)
+  }
+
   $("[data-lista-historico]").addEventListener("click", (e) => {
+    const linha = e.target.closest("[data-hist]");
+    if (!linha) return;
+    const idLinha = Number(linha.dataset.hist);
+    if (e.target.closest("[data-mudar-pagamento]")) {
+      mudandoPagamento = idLinha;
+      renderHistorico();
+      ($(`[data-hist="${idLinha}"] [data-pagou][aria-pressed="true"]`) || $(`[data-hist="${idLinha}"] [data-pagou]`))?.focus({ preventScroll: true });
+      return;
+    }
+    if (e.target.closest("[data-pagou-cancelar]")) {
+      mudandoPagamento = null;
+      renderHistorico();
+      $(`[data-hist="${idLinha}"] [data-mudar-pagamento]`)?.focus({ preventScroll: true });
+      return;
+    }
+    const opcao = e.target.closest("[data-pagou]");
+    if (opcao) {
+      mudarPagamento(idLinha, opcao.dataset.pagou);
+      return;
+    }
     const botao = e.target.closest("[data-expandir-hist]");
     if (!botao) return;
-    const id = Number(botao.closest("[data-hist]").dataset.hist);
+    const id = idLinha;
     if (historicoAbertos.has(id)) historicoAbertos.delete(id);
     else historicoAbertos.add(id);
     renderHistorico();
