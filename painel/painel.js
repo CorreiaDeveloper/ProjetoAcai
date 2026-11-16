@@ -701,6 +701,10 @@
       : `<span class="${classe} p-alerta" title="Pelo cardápio atual daria ${dinheiro(esperado)}. Confira com o cliente.">Conferir valor</span>`;
   }
 
+  // Taxa da maquininha (js/config.js → taxas). Ex.: Cartão 3,09% de R$ 30,40 = R$ 0,94.
+  const TAXAS = L.taxas || {};
+  const taxaDe = (p) => (p.status === "cancelado" ? 0 : Math.round(Number(p.total || 0) * (Number(TAXAS[p.pagamento]) || 0)) / 100);
+
   function textoPagamento(p) {
     if (!p.pagamento) return "Combinar no WhatsApp";
     if (p.troco) {
@@ -1154,10 +1158,12 @@
   function renderHistorico() {
     const validos = historico.filter((p) => p.status !== "cancelado");
     const soma = validos.reduce((s, p) => s + Number(p.total || 0), 0);
+    const taxa = validos.reduce((s, p) => s + taxaDe(p), 0);
+    const cancelados = historico.length - validos.length;
     $("[data-resumo-historico]").innerHTML = validos.length
-      ? `${validos.length} ${validos.length === 1 ? "pedido" : "pedidos"} · <strong>${dinheiro(soma)}</strong>${
-          historico.length > validos.length ? ` <span class="p-nada">(sem contar ${historico.length - validos.length} cancelado${historico.length - validos.length > 1 ? "s" : ""})</span>` : ""
-        }`
+      ? `${validos.length} ${validos.length === 1 ? "pedido" : "pedidos"} · <strong>${dinheiro(soma - taxa)}</strong>${
+          taxa > 0 ? ` <span class="p-nada">(vendido ${dinheiro(soma)} − ${dinheiro(taxa)} de taxa da maquininha)</span>` : ""
+        }${cancelados ? ` <span class="p-nada">· sem contar ${cancelados} cancelado${cancelados > 1 ? "s" : ""}</span>` : ""}`
       : "";
     $("[data-lista-historico]").innerHTML = historico.length
       ? historico.map(htmlHistorico).join("")
@@ -1172,6 +1178,7 @@
       `<span><b>Situação:</b> ${esc(NOME_STATUS[p.status] || p.status)}${ATIVOS.includes(p.status) ? "" : ` às ${horaSP(p.atualizado_em)}`}</span>`,
       sinalValor(p, "p-sinal"),
       `<span><b>Pagamento:</b> ${esc(textoPagamento(p))}</span>`,
+      taxaDe(p) > 0 ? `<span><b>Taxa da maquininha:</b> − ${dinheiro(taxaDe(p))} (sobra ${dinheiro(Number(p.total) - taxaDe(p))})</span>` : "",
       Number(p.desconto) > 0 ? `<span><b>Cupom ${esc(p.cupom || "")}:</b> − ${dinheiro(p.desconto)}</span>` : "",
       p.observacoes ? `<span><b>Obs.:</b> ${esc(p.observacoes)}</span>` : "",
     ].join("");
@@ -1211,10 +1218,11 @@
     }
   }
 
-  // Texto numa célula. O que o cliente digitou e começa com = + - @ vai como texto,
+  // Texto numa célula. Quebra de linha (ex.: na observação) vira " / ", para cada pedido
+  // ficar numa linha só. O que o cliente digitou e começa com = + - @ vai como texto,
   // senão o Excel poderia tratar como fórmula.
   function celula(v) {
-    let t = String(v ?? "");
+    let t = String(v ?? "").replace(/\s*[\r\n]+\s*/g, " / ");
     if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
     return /[";\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   }
@@ -1235,7 +1243,7 @@
   function linhasPlanilha(pedidos) {
     const tamanhos = L.tamanhos || [];
     const cabecalho = ["Código", "Data", "Hora", "Situação", "Nome", "Torre", "Apto", "Copos", ...tamanhos.map((t) => `Copos ${t.nome}`),
-      "Pedido", "Subtotal", "Cupom", "Desconto", "Total", "Pagamento", "Troco para", "Observação", "Loja fechada", "Conferir"];
+      "Pedido", "Subtotal", "Cupom", "Desconto", "Total", "Taxa da maquininha", "Líquido", "Pagamento", "Troco para", "Observação", "Loja fechada", "Conferir"];
     const linha = (p) => {
       const esperado = valorNaoConfere(p);
       const conferir = [esperado !== null ? `valor: pelo cardápio daria ${valorPlanilha(esperado)}` : "", p.cupom_ok === false ? "cupom" : ""];
@@ -1254,6 +1262,9 @@
         celula(p.cupom),
         valorPlanilha(p.desconto ?? 0),
         valorPlanilha(p.total),
+        valorPlanilha(taxaDe(p)),
+        // o que entrou de verdade: total menos a taxa (cancelado = 0, então dá para somar a coluna direto)
+        valorPlanilha(p.status === "cancelado" ? 0 : Number(p.total || 0) - taxaDe(p)),
         celula(p.pagamento || "Combinar no WhatsApp"),
         valorPlanilha(p.troco),
         celula(p.observacoes),

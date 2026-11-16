@@ -29,6 +29,10 @@ window.LOJA = {
   // Exemplo: ["Pix", "Dinheiro"]
   formasPagamento: ["Pix", "Dinheiro", "Cartão"],
 
+  // Taxa (%) que a maquininha cobra em cada forma de pagamento (o nome igual ao de cima).
+  // O painel desconta essa taxa para mostrar quanto sobra de verdade (Histórico e planilha).
+  taxas: { "Cartão": 3.09 },
+
   // Painel de pedidos (Supabase). Cada pedido enviado também aparece no painel
   // e o cliente pode usar cupom de desconto. A chave abaixo é PÚBLICA, feita para
   // ficar no site (quem protege os pedidos são as regras do banco).

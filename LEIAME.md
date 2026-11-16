@@ -17,6 +17,7 @@ Dê dois cliques em `index.html`. Ele abre no navegador e funciona sem instalar 
 | Aviso "Aberto agora" / "Fechado" | **no painel**, pelo botão "Loja ABERTA / FECHADA" (não fica mais no arquivo) |
 | Taxa de entrega | `taxaEntrega` (`0` = grátis) |
 | Perguntar a forma de pagamento | `formasPagamento`: deixe `[]` para não perguntar, ou ex.: `["Pix", "Dinheiro"]` |
+| Taxa da maquininha | `taxas`: em %, com o mesmo nome da forma de pagamento, ex.: `{ "Cartão": 3.09 }` |
 | Preço dos copos | `tamanhos` |
 | Preço de cada fruta ou acompanhamento | `preco` dentro de `frutas` e `acompanhamentos` |
 | Combinações prontas ("clássicos") | `classicos` |
@@ -47,9 +48,10 @@ Endereço: **https://ganath.vercel.app/painel/** (no computador e no celular, co
 - **Loja ABERTA / FECHADA:** é o botão no topo. Toque, confirme, e o site muda na hora. Se o outro aparelho estiver com o painel aberto, ele também atualiza sozinho. O site não mostra desde quando a loja está fechada, só se está aberta ou não.
 - **Pedidos:** chegam na hora, com som, numa lista em linhas por ordem de chegada (nº do pedido, horário, nome, torre e apto). Ao clicar na linha, ela mostra o que o cliente escolheu (tamanho, frutas e complementos), a forma de pagamento (com o troco) e o total. Cada pedido passa por Novos → Montando → Prontos para entregar → Entregue. No menu ⋯ dá para voltar, cancelar ou apagar o pedido.
 - **Histórico:** os pedidos das últimas 2 semanas, um por linha (código, dia e horário, nome, apto e valor), com o total do período. Ao clicar, mostra os detalhes do pedido. É só para consulta.
+  - **Total já sem a taxa da maquininha:** o valor em destaque é o que sobra de verdade. Do lado aparece quanto foi vendido e quanto a maquininha levou (3,09% no cartão, de `taxas` no `js/config.js`). No pedido aberto aparece a taxa daquele pedido.
   - Os pedidos mais antigos saem da tela, mas **continuam guardados no banco**: nada é apagado sozinho, só pelo "Apagar pedido".
-  - **Baixar planilha completa:** salva **todos** os pedidos, desde o primeiro, num arquivo `.csv` que abre no Excel ou no Google Planilhas. Tem uma linha por pedido: data, hora, situação, cliente, quantos copos de cada tamanho, o que foi pedido, subtotal, cupom, desconto, total, pagamento, troco e observação. Os valores já vêm como número, prontos para somar.
-  - Os cancelados também vêm na planilha, com "Cancelado" na coluna Situação. Filtre por ela antes de somar o faturamento.
+  - **Baixar planilha completa:** salva **todos** os pedidos, desde o primeiro, num arquivo `.csv` que abre no Excel ou no Google Planilhas. Tem uma linha por pedido: data, hora, situação, cliente, quantos copos de cada tamanho, o que foi pedido, subtotal, cupom, desconto, total, taxa da maquininha, líquido, pagamento, troco e observação. Os valores já vêm como número, prontos para somar.
+  - **Para saber quanto entrou, some a coluna "Líquido":** ela já tira a taxa da maquininha, e os cancelados vêm com 0. A coluna "Total" é o valor cobrado do cliente, e os cancelados aparecem com "Cancelado" na coluna Situação.
   - **Guarde uma cópia de vez em quando** (uma vez por mês, por exemplo): o plano grátis do Supabase não tem cópia de segurança para recuperar um pedido apagado.
 - **Montagem do copo:** o botão "Montagem" mostra as 5 camadas, de baixo para cima: recheio, açaí, recheio, açaí, recheio, e a observação do cliente. O açaí nunca vai no fundo.
   - **Fundo:** caldas + pós.
